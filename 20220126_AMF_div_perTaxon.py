@@ -178,10 +178,11 @@ def pipeline(classProperty):
 
     # Write the name of a local staging area folder for outputted CSV's
     holdingFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/data/'
-    outputFoflder = '/Users/johanvandenhoogen/SPUN/richness_maps/output/'
+    outputFoflder = '/Users/johanvandenhoogen/SPUN/richness_maps/output/'+classProperty+'/'
 
     # Create directory to hold training data
     Path(holdingFolder).mkdir(parents=True, exist_ok=True)
+    Path(outputFoflder).mkdir(parents=True, exist_ok=True)
 
     ####################################################################################################################################################################
     # Export settings
@@ -574,7 +575,7 @@ def pipeline(classProperty):
         grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
 
     # Write grid search results to csv
-    GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv(outputFoflder+'/'+classProperty+'_grid_search_results.csv')
+    GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv(outputFoflder+classProperty+'_grid_search_results.csv')
 
     ##################################################################################################################################################################
     # Classify image
@@ -726,14 +727,14 @@ def pipeline(classProperty):
     	featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
     # Write to csv
-    featureImportances.to_csv(outputFoflder+'/'+classProperty+'_featureImportances.csv')
+    featureImportances.to_csv(outputFoflder+classProperty+'_featureImportances.csv')
     featureImportances.sort_values('Feature_Importance', ascending = False, inplace = True)
 
     # Create and save plot
     plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
     							  title='Feature Importances')
     fig = plt.get_figure()
-    fig.savefig(outputFoflder+'/'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+    fig.savefig(outputFoflder+classProperty+'_FeatureImportances.png', bbox_inches='tight')
 
     print('Variable importance metrics complete! Moving on...')
 
