@@ -19,16 +19,16 @@ from itertools import combinations
 from itertools import repeat
 ee.Initialize()
 
-taxonList =[ "Glomus",
-"Claroideoglomus",
-"Rhizophagus",
-"Dominikia",
-"Funneliformis",
-"Diversispora",
-"Acaulospora",
-"Septoglomus",
-"Scutellospora",
-"Archaeospora"]
+taxonList =["Inocybe",
+"Cortinarius",
+"Laccaria",
+"Ruhlandiella",
+"Tomentella",
+"Russula",
+"Reddellomyces",
+"Tricholoma",
+"Piloderma",
+"Meliniomyces"]
 
 def pipeline(classProperty):
     ####################################################################################################################################################################
@@ -46,7 +46,7 @@ def pipeline(classProperty):
 
     # Input the name of the project folder inside which all of the assets will be stored
     # This folder will be generated automatically below, if it isn't yet present
-    projectFolder = '000_SPUN/diversity/'+'AMF_'+classProperty
+    projectFolder = '000_SPUN/diversity/'+'ECM_'+classProperty
 
     # Input the normal wait time (in seconds) for "wait and break" cells
     normalWaitTime = 5
@@ -177,7 +177,7 @@ def pipeline(classProperty):
     assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
 
     # Write the name of a local staging area folder for outputted CSV's
-    holdingFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/data/'
+    holdingFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/data/ECM_per_taxa/'
     outputFoflder = '/Users/johanvandenhoogen/SPUN/richness_maps/output/'+classProperty+'/'
 
     # Create directory to hold training data
@@ -423,10 +423,10 @@ def pipeline(classProperty):
     # Data processing
     ####################################################################################################################################################################
     # Import the sampled data
-    sampled_data = pd.read_csv('data/20211026_AMF_diversity_data_sampled.csv', float_precision='round_trip').drop(columns=['myco_diversity'])
+    sampled_data = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip').drop(columns=['myco_diversity'])
 
     # Import the rarefied richness values
-    rarefied_richness = pd.read_csv('data/'+classProperty+'_to_map.csv', float_precision='round_trip')
+    rarefied_richness = pd.read_csv('data/ECM/ECM_'+classProperty+'_to_map.csv', float_precision='round_trip')
 
     # Combine into one df
     rawPointCollection = pd.concat([sampled_data.set_index('sample_id'),rarefied_richness.set_index('sample_id')], axis=1, join='inner').reset_index()
