@@ -426,7 +426,7 @@ def pipeline(classProperty):
     sampled_data = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip').drop(columns=['myco_diversity'])
 
     # Import the rarefied richness values
-    rarefied_richness = pd.read_csv('data/ECM/ECM_'+classProperty+'_to_map.csv', float_precision='round_trip')
+    rarefied_richness = pd.read_csv(holdingFolder+'ECM_'+classProperty+'_to_map.csv', float_precision='round_trip')
 
     # Combine into one df
     rawPointCollection = pd.concat([sampled_data.set_index('sample_id'),rarefied_richness.set_index('sample_id')], axis=1, join='inner').reset_index()
@@ -1121,7 +1121,7 @@ def pipeline(classProperty):
 
     """
 
-number_of_processes = 10
+number_of_processes = 12
 
 @contextmanager
 def poolcontext(*args, **kwargs):
