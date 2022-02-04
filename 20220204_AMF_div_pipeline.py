@@ -23,7 +23,7 @@ usernameFolderString = 'johanvandenhoogen'
 
 # Input the Cloud Storage Bucket that will hold the bootstrap collections when uploading them to Earth Engine
 # !! This bucket should be pre-created before running this script
-bucketOfInterest = '20200406_soil_temperature_jh'
+bucketOfInterest = 'johanvandenhoogen'
 
 # Input the name of the classification property
 classProperty = 'AMF_diversity'
@@ -181,8 +181,8 @@ exportingGeometry = ee.Geometry.Polygon([[[-180, 88], [180, 88], [180, -88], [-1
 # Bootstrap settings
 ####################################################################################################################################################################
 
-# Number of bootstrap iterations0
-bootstrapIterations = 10
+# Number of bootstrap iterations
+bootstrapIterations = 100
 
 # Generate the seeds for bootstrapping
 seedsToUseForBootstrapping = list(range(1, bootstrapIterations+1))
@@ -724,14 +724,14 @@ for n in seedsToUseForBootstrapping:
     # Format the title of the CSV and export it to a holding location
     titleOfBootstrapCSV = fileNameHeader+str(n).zfill(3)
     fileNameList.append(titleOfBootstrapCSV)
-    fullLocalPath = holdingFolder+'/'+titleOfBootstrapCSV+'.csv'
-    stratSample.to_csv(holdingFolder+'/'+titleOfBootstrapCSV+'.csv',index=False)
-
-    # Format the bash call to upload the files to the Google Cloud Storage bucket
-    gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
-    subprocess.run(gsutilBashUploadList)
-    print(titleOfBootstrapCSV+' uploaded to a GCSB!')
-
+    # fullLocalPath = holdingFolder+'/'+titleOfBootstrapCSV+'.csv'
+    # stratSample.to_csv(holdingFolder+'/'+titleOfBootstrapCSV+'.csv',index=False)
+    #
+    # # Format the bash call to upload the files to the Google Cloud Storage bucket
+    # gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
+    # subprocess.run(gsutilBashUploadList)
+    # print(titleOfBootstrapCSV+' uploaded to a GCSB!')
+'''
 # Wait for the GSUTIL uploading process to finish before moving on
 while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in fileNameList):
     print('Not everything is uploaded...')
@@ -772,7 +772,7 @@ while count >= 1:
     print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
     time.sleep(normalWaitTime)
 print('Moving on...')
-
+'''
 # Load the best model from the classifier list
 classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
 
@@ -800,7 +800,6 @@ def bootstrapFunc(fc):
     # classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
     #
     # return classifiedImage
-
 
     def finalImageClassification(compositeImg):
         if ensemble == False:
@@ -884,31 +883,42 @@ stdDevImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).re
 # Create a feature collection with only the values from the image bands
 fcForMinMax = fcOI.select(covariateList)
 
+def univariateIntExt(composite):
+    compositeForIntExt = composite.addBands(constant_imgs).select(covariateList).reproject(composite.projection())
 
-compositeForIntExt = compositeToClassify.addBands(constant_imgs).select(covariateList).reproject(compositeToClassify.projection())
+    # Make a FC with the band names
+    fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
 
+    def calcMinMax(f):
+      bandBeingComputed = f.get('BandName')
+      maxValueToSet = fcForMinMax.reduceColumns(ee.Reducer.minMax(),[bandBeingComputed])
+      return f.set('MinValue',maxValueToSet.get('min')).set('MaxValue',maxValueToSet.get('max'))
 
-# Make a FC with the band names
-fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
+    # Map function
+    fcWithMinMaxValues = ee.FeatureCollection(fcWithBandNames).map(calcMinMax)
 
-def calcMinMax(f):
-  bandBeingComputed = f.get('BandName')
-  maxValueToSet = fcForMinMax.reduceColumns(ee.Reducer.minMax(),[bandBeingComputed])
-  return f.set('MinValue',maxValueToSet.get('min')).set('MaxValue',maxValueToSet.get('max'))
+    # Make two images from these values (a min and a max image)
+    maxValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MaxValue'))
+    maxDict = ee.Dictionary.fromLists(covariateList,maxValuesWNulls)
+    minValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MinValue'))
+    minDict = ee.Dictionary.fromLists(covariateList,minValuesWNulls)
+    minImage = minDict.toImage()
+    maxImage = maxDict.toImage()
 
-# Map function
-fcWithMinMaxValues = ee.FeatureCollection(fcWithBandNames).map(calcMinMax)
+    totalBandsBinary = compositeForIntExt.gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
+    univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeForIntExt.bandNames().length()).rename('univariate_pct_int_ext')
 
-# Make two images from these values (a min and a max image)
-maxValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MaxValue'))
-maxDict = ee.Dictionary.fromLists(covariateList,maxValuesWNulls)
-minValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MinValue'))
-minDict = ee.Dictionary.fromLists(covariateList,minValuesWNulls)
-minImage = minDict.toImage()
-maxImage = maxDict.toImage()
+    return univariate_int_ext_image
 
-totalBandsBinary = compositeForIntExt.gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
-univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeForIntExt.bandNames().length()).rename('univariate_pct_int_ext')
+univariate_int_ext_image = ee.ImageCollection.fromImages(list(map(univariateIntExt, compositeList))).toBands().rename(['int_ext_current',
+'int_ext_rcp26_2050',
+'int_ext_rcp26_2070',
+'int_ext_rcp45_2050',
+'int_ext_rcp45_2070',
+'int_ext_rcp60_2050',
+'int_ext_rcp60_2070',
+'int_ext_rcp85_2050',
+'int_ext_rcp85_2070'])
 
 ##################################################################################################################################################################
 # Multivariate (PCA) int-ext analysis
@@ -917,94 +927,107 @@ univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeForInt
 # Input the proportion of variance that you would like to cover
 propOfVariance = 90
 
-# PCA interpolation/extrapolation helper function
-def assessExtrapolation(fcOfInterest, propOfVariance):
-    # Compute the mean and standard deviation of each band, then standardize the point data
-    meanVector = fcOfInterest.mean()
-    stdVector = fcOfInterest.std()
-    standardizedData = (fcOfInterest-meanVector)/stdVector
+def PCA_int_extFunc(compositeForIntExt):
 
-    # Then standardize the composite from which the points were sampled
-    meanList = meanVector.tolist()
-    stdList = stdVector.tolist()
-    bandNames = list(meanVector.index)
-    meanImage = ee.Image(meanList).rename(bandNames)
-    stdImage = ee.Image(stdList).rename(bandNames)
-    standardizedImage = compositeForIntExt.subtract(meanImage).divide(stdImage)
+    # PCA interpolation/extrapolation helper function
+    def assessExtrapolation(fcOfInterest, propOfVariance):
+        # Compute the mean and standard deviation of each band, then standardize the point data
+        meanVector = fcOfInterest.mean()
+        stdVector = fcOfInterest.std()
+        standardizedData = (fcOfInterest-meanVector)/stdVector
 
-    # Run a PCA on the point samples
-    pcaOutput = PCA()
-    pcaOutput.fit(standardizedData)
+        # Then standardize the composite from which the points were sampled
+        meanList = meanVector.tolist()
+        stdList = stdVector.tolist()
+        bandNames = list(meanVector.index)
+        meanImage = ee.Image(meanList).rename(bandNames)
+        stdImage = ee.Image(stdList).rename(bandNames)
+        standardizedImage = compositeForIntExt.subtract(meanImage).divide(stdImage)
 
-    # Save the cumulative variance represented by each PC
-    cumulativeVariance = np.cumsum(np.round(pcaOutput.explained_variance_ratio_, decimals=4)*100)
+        # Run a PCA on the point samples
+        pcaOutput = PCA()
+        pcaOutput.fit(standardizedData)
 
-    # Make a list of PC names for future organizational purposes
-    pcNames = ['PC'+str(x) for x in range(1,fcOfInterest.shape[1]+1)]
+        # Save the cumulative variance represented by each PC
+        cumulativeVariance = np.cumsum(np.round(pcaOutput.explained_variance_ratio_, decimals=4)*100)
 
-    # Get the PC loadings as a data frame
-    loadingsDF = pd.DataFrame(pcaOutput.components_,columns=[str(x)+'_Loads' for x in bandNames],index=pcNames)
+        # Make a list of PC names for future organizational purposes
+        pcNames = ['PC'+str(x) for x in range(1,fcOfInterest.shape[1]+1)]
 
-    # Get the original data transformed into PC space
-    transformedData = pd.DataFrame(pcaOutput.fit_transform(standardizedData,standardizedData),columns=pcNames)
+        # Get the PC loadings as a data frame
+        loadingsDF = pd.DataFrame(pcaOutput.components_,columns=[str(x)+'_Loads' for x in bandNames],index=pcNames)
 
-    # Make principal components images, multiplying the standardized image by each of the eigenvectors
-    # Collect each one of the images in a single image collection
+        # Get the original data transformed into PC space
+        transformedData = pd.DataFrame(pcaOutput.fit_transform(standardizedData,standardizedData),columns=pcNames)
 
-    # First step: make an image collection wherein each image is a PC loadings image
-    listOfLoadings = ee.List(loadingsDF.values.tolist())
-    eePCNames = ee.List(pcNames)
-    zippedList = eePCNames.zip(listOfLoadings)
-    def makeLoadingsImage(zippedValue):
-        return ee.Image.constant(ee.List(zippedValue).get(1)).rename(bandNames).set('PC',ee.List(zippedValue).get(0))
-    loadingsImageCollection = ee.ImageCollection(zippedList.map(makeLoadingsImage))
+        # Make principal components images, multiplying the standardized image by each of the eigenvectors
+        # Collect each one of the images in a single image collection
 
-    # Second step: multiply each of the loadings image by the standardized image and reduce it using a "sum"
-    # to finalize the matrix multiplication
-    def finalizePCImages(loadingsImage):
-        PCName = ee.String(ee.Image(loadingsImage).get('PC'))
-        return ee.Image(loadingsImage).multiply(standardizedImage).reduce('sum').rename([PCName]).set('PC',PCName)
-    principalComponentsImages = loadingsImageCollection.map(finalizePCImages)
+        # First step: make an image collection wherein each image is a PC loadings image
+        listOfLoadings = ee.List(loadingsDF.values.tolist())
+        eePCNames = ee.List(pcNames)
+        zippedList = eePCNames.zip(listOfLoadings)
+        def makeLoadingsImage(zippedValue):
+            return ee.Image.constant(ee.List(zippedValue).get(1)).rename(bandNames).set('PC',ee.List(zippedValue).get(0))
+        loadingsImageCollection = ee.ImageCollection(zippedList.map(makeLoadingsImage))
 
-    # Choose how many principal components are of interest in this analysis based on amount of
-    # variance explained
-    numberOfComponents = sum(i < propOfVariance for i in cumulativeVariance)+1
-    print('Number of Principal Components being used:',numberOfComponents)
+        # Second step: multiply each of the loadings image by the standardized image and reduce it using a "sum"
+        # to finalize the matrix multiplication
+        def finalizePCImages(loadingsImage):
+            PCName = ee.String(ee.Image(loadingsImage).get('PC'))
+            return ee.Image(loadingsImage).multiply(standardizedImage).reduce('sum').rename([PCName]).set('PC',PCName)
+        principalComponentsImages = loadingsImageCollection.map(finalizePCImages)
 
-    # Compute the combinations of the principal components being used to compute the 2-D convex hulls
-    tupleCombinations = list(combinations(list(pcNames[0:numberOfComponents]),2))
-    print('Number of Combinations being used:',len(tupleCombinations))
+        # Choose how many principal components are of interest in this analysis based on amount of
+        # variance explained
+        numberOfComponents = sum(i < propOfVariance for i in cumulativeVariance)+1
+        print('Number of Principal Components being used:',numberOfComponents)
 
-    # Generate convex hulls for an example of the principal components of interest
-    cHullCoordsList = list()
-    for c in tupleCombinations:
-        firstPC = c[0]
-        secondPC = c[1]
-        outputCHull = ConvexHull(transformedData[[firstPC,secondPC]])
-        listOfCoordinates = transformedData.loc[outputCHull.vertices][[firstPC,secondPC]].values.tolist()
-        flattenedList = [val for sublist in listOfCoordinates for val in sublist]
-        cHullCoordsList.append(flattenedList)
+        # Compute the combinations of the principal components being used to compute the 2-D convex hulls
+        tupleCombinations = list(combinations(list(pcNames[0:numberOfComponents]),2))
+        print('Number of Combinations being used:',len(tupleCombinations))
 
-    # Reformat the image collection to an image with band names that can be selected programmatically
-    pcImage = principalComponentsImages.toBands().rename(pcNames)
+        # Generate convex hulls for an example of the principal components of interest
+        cHullCoordsList = list()
+        for c in tupleCombinations:
+            firstPC = c[0]
+            secondPC = c[1]
+            outputCHull = ConvexHull(transformedData[[firstPC,secondPC]])
+            listOfCoordinates = transformedData.loc[outputCHull.vertices][[firstPC,secondPC]].values.tolist()
+            flattenedList = [val for sublist in listOfCoordinates for val in sublist]
+            cHullCoordsList.append(flattenedList)
 
-    # Generate an image collection with each PC selected with it's matching PC
-    listOfPCs = ee.List(tupleCombinations)
-    listOfCHullCoords = ee.List(cHullCoordsList)
-    zippedListPCsAndCHulls = listOfPCs.zip(listOfCHullCoords)
+        # Reformat the image collection to an image with band names that can be selected programmatically
+        pcImage = principalComponentsImages.toBands().rename(pcNames)
 
-    def makeToClassifyImages(zippedListPCsAndCHulls):
-        imageToClassify = pcImage.select(ee.List(zippedListPCsAndCHulls).get(0)).set('CHullCoords',ee.List(zippedListPCsAndCHulls).get(1))
-        classifiedImage = imageToClassify.rename('u','v').classify(ee.Classifier.spectralRegion([imageToClassify.get('CHullCoords')]))
-        return classifiedImage
+        # Generate an image collection with each PC selected with it's matching PC
+        listOfPCs = ee.List(tupleCombinations)
+        listOfCHullCoords = ee.List(cHullCoordsList)
+        zippedListPCsAndCHulls = listOfPCs.zip(listOfCHullCoords)
 
-    classifedImages = ee.ImageCollection(zippedListPCsAndCHulls.map(makeToClassifyImages))
-    finalImageToExport = classifedImages.sum().divide(ee.Image.constant(len(tupleCombinations)))
+        def makeToClassifyImages(zippedListPCsAndCHulls):
+            imageToClassify = pcImage.select(ee.List(zippedListPCsAndCHulls).get(0)).set('CHullCoords',ee.List(zippedListPCsAndCHulls).get(1))
+            classifiedImage = imageToClassify.rename('u','v').classify(ee.Classifier.spectralRegion([imageToClassify.get('CHullCoords')]))
+            return classifiedImage
 
-    return finalImageToExport
+        classifedImages = ee.ImageCollection(zippedListPCsAndCHulls.map(makeToClassifyImages))
+        finalImageToExport = classifedImages.sum().divide(ee.Image.constant(len(tupleCombinations)))
 
-# PCA interpolation-extrapolation image
-PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
+        return finalImageToExport
+
+    # PCA interpolation-extrapolation image
+    PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
+    return PCA_int_ext
+
+PCA_int_ext = ee.ImageCollection.fromImages(list(map(PCA_int_extFunc, compositeList))).toBands().rename(['PCA_int_ext_current',
+'PCA_int_ext_rcp26_2050',
+'PCA_int_ext_rcp26_2070',
+'PCA_int_ext_rcp45_2050',
+'PCA_int_ext_rcp45_2070',
+'PCA_int_ext_rcp60_2050',
+'PCA_int_ext_rcp60_2070',
+'PCA_int_ext_rcp85_2050',
+'PCA_int_ext_rcp85_2070'])
 
 ##################################################################################################################################################################
 # Final image export
@@ -1012,14 +1035,14 @@ PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVarian
 
 # Construct final image to export
 if log_transform_classProperty == True:
-    finalImageToExport = ee.Image.cat(classifiedImageSingleMap.exp(),
+    finalImageToExport = ee.Image.cat(image_toExport.exp(),
     meanImage.exp(),
     upperLowerCIImage.exp(),
     stdDevImage.exp(),
     univariate_int_ext_image,
     PCA_int_ext)
 else:
-    finalImageToExport = ee.Image.cat(classifiedImageSingleMap,
+    finalImageToExport = ee.Image.cat(image_toExport,
     meanImage,
     upperLowerCIImage,
     stdDevImage,
@@ -1029,11 +1052,12 @@ else:
 FinalBoostrapImageExport = ee.batch.Export.image.toAsset(
     image = finalImageToExport.toFloat(),
     description = classProperty+'_Bootstrapped_MultibandImage',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wPrimers' ,
+    # assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wPrimers',
+    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wFuturePreds',
     crs = 'EPSG:4326',
     crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
     region = exportingGeometry,
-    maxPixels = int(1e13),
+    maxPixels = int(1e16),
     pyramidingPolicy = {".default": pyramidingPolicy}
 )
 FinalBoostrapImageExport.start()
