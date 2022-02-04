@@ -577,9 +577,6 @@ primers = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id
 # constant_imgs = ee.ImageCollection.fromImages([top, bot, corelength, platform_id, marker_id, type_id, primer_id]).toBands().rename(['top', 'bot', 'corelength', 'platform_id', 'marker_id', 'type_id', 'primer_id'])
 constant_imgs = ee.ImageCollection.fromImages([target_marker, sequencing_platform, sample_type, primers]).toBands().rename(['target_marker', 'sequencing_platform', 'sample_type', 'primers'])
 
-# Load the best model from the classifier list
-classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
-
 def finalImageClassification(compositeImg):
     if ensemble == False:
     	# Load the best model from the classifier list
@@ -639,19 +636,19 @@ image_toExport = ee.ImageCollection(list(map(finalImageClassification, composite
 'pred_futureClimate_rcp85_2050',
 'pred_futureClimate_rcp85_2070'])
 
-imgExport = ee.batch.Export.image.toAsset(
-    image = image_toExport.toFloat(),
-    description = classProperty+'classifiedImg_wFuturePreds',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'classifiedImg_wFuturePreds' ,
-    crs = 'EPSG:4326',
-    crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-    region = exportingGeometry,
-    maxPixels = int(1e13),
-    pyramidingPolicy = {".default": pyramidingPolicy}
-)
-imgExport.start()
-
-print('Image export started')
+# imgExport = ee.batch.Export.image.toAsset(
+#     image = image_toExport.toFloat(),
+#     description = classProperty+'classifiedImg_wFuturePreds',
+#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'classifiedImg_wFuturePreds' ,
+#     crs = 'EPSG:4326',
+#     crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+#     region = exportingGeometry,
+#     maxPixels = int(1e13),
+#     pyramidingPolicy = {".default": pyramidingPolicy}
+# )
+# imgExport.start()
+#
+# print('Image export started')
 
 ##################################################################################################################################################################
 # Variable importance metrics
@@ -710,8 +707,6 @@ fig.savefig('output/'+classProperty+'_FeatureImportances.png', bbox_inches='tigh
 
 print('Variable importance metrics complete! Moving on...')
 
-
-"""
 ##################################################################################################################################################################
 # Bootstrapping
 ##################################################################################################################################################################
@@ -798,13 +793,75 @@ for n in seedsToUseForBootstrapping:
 
     # Helper fucntion to train a RF classifier and classify the composite image
 def bootstrapFunc(fc):
-    # Train the classifier with the collection
-    trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
+    # # Train the classifier with the collection
+    # trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
+    #
+    # # Classify the image
+    # classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
+    #
+    # return classifiedImage
 
-    # Classify the image
-    classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
 
-    return classifiedImage
+    def finalImageClassification(compositeImg):
+        if ensemble == False:
+        	# Load the best model from the classifier list
+        	classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+
+        	# Train the classifier with the collection
+        	trainedClassifer = classifier.train(fc, classProperty, covariateList)
+
+        	# Classify the image
+        	classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
+
+        if ensemble == True:
+        	def classifyImage(classifierName):
+        		# Load the best model from the classifier list
+        		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+
+        		# Train the classifier with the collection
+        		trainedClassifer = classifier.train(fc, classProperty, covariateList)
+
+        		# Classify the image
+        		classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
+
+        		return classifiedImage
+
+        	# Classify the images, return mean
+        	classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
+
+        return classifiedImage
+
+    pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+    pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+
+    compositeList = [pred_climate_current,
+    pred_futureClimate_rcp26_2050,
+    pred_futureClimate_rcp26_2070,
+    pred_futureClimate_rcp45_2050,
+    pred_futureClimate_rcp45_2070,
+    pred_futureClimate_rcp60_2050,
+    pred_futureClimate_rcp60_2070,
+    pred_futureClimate_rcp85_2050,
+    pred_futureClimate_rcp85_2070]
+
+    image_toExport = ee.ImageCollection(list(map(finalImageClassification, compositeList))).toBands().rename(['pred_climate_current',
+    'pred_futureClimate_rcp26_2050',
+    'pred_futureClimate_rcp26_2070',
+    'pred_futureClimate_rcp45_2050',
+    'pred_futureClimate_rcp45_2070',
+    'pred_futureClimate_rcp60_2050',
+    'pred_futureClimate_rcp60_2070',
+    'pred_futureClimate_rcp85_2050',
+    'pred_futureClimate_rcp85_2070'])
+
+    return image_toExport
 
 # Reduce bootstrap images to mean
 meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
@@ -949,23 +1006,6 @@ def assessExtrapolation(fcOfInterest, propOfVariance):
 # PCA interpolation-extrapolation image
 PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
 
-# int_ext_images = ee.Image.cat(
-#     univariate_int_ext_image,
-#     PCA_int_ext)
-#
-# IntExtImgExport = ee.batch.Export.image.toAsset(
-#     image = int_ext_images.toFloat(),
-#     description = classProperty+'_IntExt_maps',
-#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_IntExt_maps_EnvOnly' ,
-#     crs = 'EPSG:4326',
-#     crsTransform = '[0.05,0,-180,0,-0.05,90]',
-#     region = exportingGeometry,
-#     maxPixels = int(1e13),
-#     pyramidingPolicy = {".default": pyramidingPolicy}
-# )
-# # IntExtImgExport.start()
-
-
 ##################################################################################################################################################################
 # Final image export
 ##################################################################################################################################################################
@@ -999,7 +1039,6 @@ FinalBoostrapImageExport = ee.batch.Export.image.toAsset(
 FinalBoostrapImageExport.start()
 
 print('Map exports started! Moving on...')
-
 
 ##################################################################################################################################################################
 # Spatial Leave-One-Out cross validation
@@ -1091,5 +1130,3 @@ bloo_cv_fc_export.start()
 print('Blocked Leave-One-Out started! Moving on...')
 
 print('All tasks started! Output files will apear in this folder: users/'+usernameFolderString+'/'+projectFolder)
-
-"""
