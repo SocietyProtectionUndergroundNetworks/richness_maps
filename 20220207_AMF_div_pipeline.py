@@ -705,10 +705,10 @@ if ensemble == True:
 
 # Write to csv
 featureImportances.to_csv('output/'+classProperty+'_featureImportances.csv')
-featureImportances.sort_values('Feature_Importance', inplace = True)
+featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
 
 # Create and save plot
-plt = featureImportances[:10].sort_values('Feature_Importance').plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
+plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
 							  title='Feature Importances')
 fig = plt.get_figure()
 fig.savefig('output/'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
