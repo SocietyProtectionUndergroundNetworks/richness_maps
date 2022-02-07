@@ -863,7 +863,8 @@ for key, value in dictToBoostrap.items():
     imageToExport = ee.Image.cat(meanImage,
         upperLowerCIImage,
         stdDevImage).rename(['bootstrapped_mean_'+value,
-                             'bootstrapped_CI_'+value,
+                             'bootstrapped_lower_'+value,
+                             'bootstrapped_upper_'+value,
                              'bootstrapped_stdDev_'+value])
 
     boostrapExport = ee.batch.Export.image.toAsset(
