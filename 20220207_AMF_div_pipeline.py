@@ -48,6 +48,14 @@ log_transform_classProperty = False
 # Ensemble of top 10 models?
 ensemble = True
 
+# Spatial leave-one-out cross-validation settings
+# skip test points outside training space after removing points in buffer zone? This might reduce extrapolation but overestimate accuracy
+loo_cv_wPointRemoval = False
+
+# Define buffer size in meters; use Moran's I or other test to determine SAC range
+# Alternatively: specify buffer size as list, to test across multiple buffer sizes
+buffer_size = 100000
+
 ####################################################################################################################################################################
 # Covariate data settings
 ####################################################################################################################################################################
@@ -811,43 +819,64 @@ pred_futureClimate_rcp60_2070,
 pred_futureClimate_rcp85_2050,
 pred_futureClimate_rcp85_2070]
 
-# image_toExport = ee.ImageCollection(list(map(finalImageClassification, compositeList))).toBands().rename(['pred_climate_current',
-# 'pred_futureClimate_rcp26_2050',
-# 'pred_futureClimate_rcp26_2070',
-# 'pred_futureClimate_rcp45_2050',
-# 'pred_futureClimate_rcp45_2070',
-# 'pred_futureClimate_rcp60_2050',
-# 'pred_futureClimate_rcp60_2070',
-# 'pred_futureClimate_rcp85_2050',
-# 'pred_futureClimate_rcp85_2070'])
+names = ['climate_current',
+'futureClimate_rcp26_2050',
+'futureClimate_rcp26_2070',
+'futureClimate_rcp45_2050',
+'futureClimate_rcp45_2070',
+'futureClimate_rcp60_2050',
+'futureClimate_rcp60_2070',
+'futureClimate_rcp85_2050',
+'futureClimate_rcp85_2070']
 
-# return image_toExport
+dictToBoostrap = {compositeList[i]: names[i] for i in range(len(names))}
 
-# Helper fucntion to train a RF classifier and classify the composite image
-def bootstrapFunc(fc):
-    # Train the classifier with the collection
-    trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
+for key, value in dictToBoostrap.items():
+    composite = key
 
-    # Classify the image
-    classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
+    # Helper fucntion to train a RF classifier and classify the composite image
+    def bootstrapFunc(fc):
+        # Train the classifier with the collection
+        trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
 
-    return classifiedImage
+        # Classify the image
+        classifiedImage = composite.classify(trainedClassifer,classProperty+'_Predicted')
+
+        return classifiedImage
 
 
-# Reduce bootstrap images to mean
-meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-    reducer = ee.Reducer.mean()
-)
+    # Reduce bootstrap images to mean
+    meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+        reducer = ee.Reducer.mean()
+    )
 
-# Reduce bootstrap images to lower and upper CIs
-upperLowerCIImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-    reducer = ee.Reducer.percentile([2.5,97.5],['lower','upper'])
-)
+    # Reduce bootstrap images to lower and upper CIs
+    upperLowerCIImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+        reducer = ee.Reducer.percentile([2.5,97.5],['lower','upper'])
+    )
 
-# Reduce bootstrap images to standard deviation
-stdDevImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-    reducer = ee.Reducer.stdDev()
-)
+    # Reduce bootstrap images to standard deviation
+    stdDevImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+        reducer = ee.Reducer.stdDev()
+    )
+
+    imageToExport = ee.Image.cat(meanImage,
+        upperLowerCIImage,
+        stdDevImage).rename(['bootstrapped_mean_'+value,
+                             'bootstrapped_CI_'+value,
+                             'bootstrapped_stdDev_'+value])
+
+    boostrapExport = ee.batch.Export.image.toAsset(
+        image = imageToExport.toFloat(),
+        description = classProperty+'_bootstrapped_'+value,
+        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_bootstrapped_'+value,
+        crs = 'EPSG:4326',
+        crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+        region = exportingGeometry,
+        maxPixels = int(1e13),
+        pyramidingPolicy = {".default": pyramidingPolicy}
+    )
+    boostrapExport.start()
 
 ##################################################################################################################################################################
 # Univariate int-ext analysis
@@ -1070,86 +1099,131 @@ print('Map exports started! Moving on...')
 # !! NOTE: this is a fairly computatinally intensive excercise, so there are some precautions to take to ensure servers aren't overloaded
 # !! This operaion SHOULD NOT be performed on the entire dataset
 
-# Define buffer sizes to test
-buffer_sizes = [1000, 5000, 10000, 25000, 50000, 100000, 150000, 250000, 500000]
-
 # Set number of random points to test
 if preppedCollection.shape[0] > 1000:
-    n_points = 1000 # Don't increase this value!
+	n_points = 1000 # Don't increase this value!
 else:
-    n_points = preppedCollection.shape[0]
+	n_points = preppedCollection.shape[0]
 
 # Set number of repetitions
 n_reps = 10
+nList = list(range(0,n_reps))
 
-# Instatiate list with reps
-nList = list(range(1,n_reps+1))
+if buffer_size == list():
+	# create list with species + thresholds
+	mapList = []
+	for item in nList:
+		mapList = mapList + (list(zip(buffer_size, repeat(item))))
 
-# create list with species + thresholds
-mapList = []
-for item in nList:
-    mapList = mapList + (list(zip(buffer_sizes, repeat(item))))
+	# Make a feature collection from the buffer sizes list
+	fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
 
-# Make a feature collection from the buffer sizes list
-fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(None).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
+else:
+	fc_toMap = ee.FeatureCollection(ee.List(nList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',buffer_size).set('rep',n)))
 
-# Helper function 1: Spatial Leave One Out cross-validation function:
+# Helper function 1: assess whether point is within sampled range
+def WithinRange(f):
+	testFeature = f
+	# Training FeatureCollection: all samples not within geometry of test feature
+	trainFC = fcOI.filter(ee.Filter.geometry(f.geometry()).Not())
+
+	# Make a FC with the band names
+	fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
+
+	# Helper function 1b: assess whether training point is within sampled range; per band
+	def getRange(f):
+		bandBeingComputed = f.get('BandName')
+		minValue = trainFC.aggregate_min(bandBeingComputed)
+		maxValue = trainFC.aggregate_max(bandBeingComputed)
+		testFeatureWithinRange = ee.Number(testFeature.get(bandBeingComputed)).gte(ee.Number(minValue)).bitwiseAnd(ee.Number(testFeature.get(bandBeingComputed)).lte(ee.Number(maxValue)))
+		return f.set('within_range', testFeatureWithinRange)
+
+	# Return value of 1 if all bands are within sampled range
+	within_range = fcWithBandNames.map(getRange).aggregate_min('within_range')
+
+	return f.set('within_range', within_range)
+
+# Helper function 2: Spatial Leave One Out cross-validation function:
 def BLOOcv(f):
-    # Test feature
-    testFeature = ee.FeatureCollection(f)
+	# Get iteration ID
+	rep = f.get('rep')
 
-    # Training set: all samples not within geometry of test feature
-    trainFC = fcOI.filter(ee.Filter.geometry(testFeature).Not())
+	# Test feature
+	testFeature = ee.FeatureCollection(f)
 
-    # Classifier to test: same hyperparameter settings as from grid search procedure
-    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).
-                                              filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+	# Training FeatureCollection: all samples not within geometry of test feature
+	trainFC = fcOI.filter(ee.Filter.geometry(testFeature).Not())
 
-    # Train classifier
-    trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
+	if ensemble == False:
+		# Classifier to test: same hyperparameter settings as top model from grid search procedure
+		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-    # Apply classifier
-    classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
+	if ensemble == True:
+		# Classifiers to test: top 10 models from grid search hyperparameter tuning
+		classifierName = top_10Models.get(rep)
+		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-    # Get predicted value
-    predicted = classified.first().get('predicted')
+	# Train classifier
+	trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
 
-    # Set predicted value to feature
-    return f.set('predicted', predicted).copyProperties(f)
+	# Apply classifier
+	classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
 
-# Helper function 2: R2 calculation function
+	# Get predicted value
+	predicted = classified.first().get('predicted')
+
+	# Set predicted value to feature
+	return f.set('predicted', predicted).copyProperties(f)
+
+# Helper function 3: R2 calculation function
 def calc_R2(f):
-    rep = f.get('rep')
-    # FeatureCollection holding the buffer radius
-    buffer_size = f.get('buffer_size')
+	# Get iteration ID
+	rep = f.get('rep')
 
-    # Sample 1000 validation points from the data
-    fc_withRandom = fcOI.randomColumn(seed = rep)
-    subsetData = fc_withRandom.sort('random').limit(n_points)
+	# FeatureCollection holding the buffer radius
+	buffer_size = f.get('buffer_size')
 
-    # Add the buffer around the validation data
-    fc_wBuffer = subsetData.map(lambda f: f.buffer(buffer_size))
+	# Sample 1000 validation points from the data
+	subsetData = fcOI.randomColumn(seed = rep).sort('random').limit(n_points)
 
-    # Apply blocked leave one out CV function
-    predicted = fc_wBuffer.map(BLOOcv)
+	# Add the buffer around the validation data
+	fc_wBuffer = subsetData.map(lambda f: f.buffer(buffer_size))
 
-    # Calculate R2 value
-    R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
+	# Add the iteration ID to the FC
+	fc_toValidate = fc_wBuffer.map(lambda f: f.set('rep', rep))
 
-    return(f.set('R2_val', R2_val))
+	if loo_cv_wPointRemoval == True:
+		# Remove points not within sampled range
+		fc_withinSampledRange = fc_toValidate.map(WithinRange).filter(ee.Filter.eq('within_range', 1))
+
+		# Apply blocked leave one out CV function
+		predicted = fc_withinSampledRange.map(BLOOcv)
+
+		# outputName = '_sloo_cv_results_woExtrapolation'
+
+	if loo_cv_wPointRemoval == False:
+		# Apply blocked leave one out CV function
+		predicted = fc_toValidate.map(BLOOcv)
+
+		# outputName = '_sloo_cv_results_wExtrapolation'
+
+	# Calculate R2 value
+	R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
+
+	return f.set('R2_val', R2_val)
 
 # Calculate R2 across range of buffer sizes
 sloo_cv = fc_toMap.map(calc_R2)
 
 # Export FC to assets
 bloo_cv_fc_export = ee.batch.Export.table.toAsset(
-    collection = sloo_cv,
-    description = classProperty+'_sloo_cv',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_sloo_cv_results'
+	collection = sloo_cv,
+	description = classProperty+'_sloo_cv',
+	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_sloo_cv_results_wExtrapolation'
 )
-
 bloo_cv_fc_export.start()
 
 print('Blocked Leave-One-Out started! Moving on...')
+
 
 print('All tasks started! Output files will apear in this folder: users/'+usernameFolderString+'/'+projectFolder)
