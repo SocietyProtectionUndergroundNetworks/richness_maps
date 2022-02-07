@@ -791,76 +791,48 @@ for n in seedsToUseForBootstrapping:
     # Append fc to list
     fcList.append(fcToTrain)
 
-    # Helper fucntion to train a RF classifier and classify the composite image
+pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+
+compositeList = [pred_climate_current,
+pred_futureClimate_rcp26_2050,
+pred_futureClimate_rcp26_2070,
+pred_futureClimate_rcp45_2050,
+pred_futureClimate_rcp45_2070,
+pred_futureClimate_rcp60_2050,
+pred_futureClimate_rcp60_2070,
+pred_futureClimate_rcp85_2050,
+pred_futureClimate_rcp85_2070]
+
+# image_toExport = ee.ImageCollection(list(map(finalImageClassification, compositeList))).toBands().rename(['pred_climate_current',
+# 'pred_futureClimate_rcp26_2050',
+# 'pred_futureClimate_rcp26_2070',
+# 'pred_futureClimate_rcp45_2050',
+# 'pred_futureClimate_rcp45_2070',
+# 'pred_futureClimate_rcp60_2050',
+# 'pred_futureClimate_rcp60_2070',
+# 'pred_futureClimate_rcp85_2050',
+# 'pred_futureClimate_rcp85_2070'])
+
+# return image_toExport
+
+# Helper fucntion to train a RF classifier and classify the composite image
 def bootstrapFunc(fc):
-    # # Train the classifier with the collection
-    # trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
-    #
-    # # Classify the image
-    # classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
-    #
-    # return classifiedImage
+    # Train the classifier with the collection
+    trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
 
-    def finalImageClassification(compositeImg):
-        if ensemble == False:
-        	# Load the best model from the classifier list
-        	classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+    # Classify the image
+    classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
 
-        	# Train the classifier with the collection
-        	trainedClassifer = classifier.train(fc, classProperty, covariateList)
+    return classifiedImage
 
-        	# Classify the image
-        	classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-
-        if ensemble == True:
-        	def classifyImage(classifierName):
-        		# Load the best model from the classifier list
-        		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
-
-        		# Train the classifier with the collection
-        		trainedClassifer = classifier.train(fc, classProperty, covariateList)
-
-        		# Classify the image
-        		classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-
-        		return classifiedImage
-
-        	# Classify the images, return mean
-        	classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
-
-        return classifiedImage
-
-    pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-    pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-
-    compositeList = [pred_climate_current,
-    pred_futureClimate_rcp26_2050,
-    pred_futureClimate_rcp26_2070,
-    pred_futureClimate_rcp45_2050,
-    pred_futureClimate_rcp45_2070,
-    pred_futureClimate_rcp60_2050,
-    pred_futureClimate_rcp60_2070,
-    pred_futureClimate_rcp85_2050,
-    pred_futureClimate_rcp85_2070]
-
-    image_toExport = ee.ImageCollection(list(map(finalImageClassification, compositeList))).toBands().rename(['pred_climate_current',
-    'pred_futureClimate_rcp26_2050',
-    'pred_futureClimate_rcp26_2070',
-    'pred_futureClimate_rcp45_2050',
-    'pred_futureClimate_rcp45_2070',
-    'pred_futureClimate_rcp60_2050',
-    'pred_futureClimate_rcp60_2070',
-    'pred_futureClimate_rcp85_2050',
-    'pred_futureClimate_rcp85_2070'])
-
-    return image_toExport
 
 # Reduce bootstrap images to mean
 meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
@@ -930,7 +902,7 @@ univariate_int_ext_export = ee.batch.Export.image.toAsset(
     maxPixels = int(1e13),
     pyramidingPolicy = {".default": pyramidingPolicy}
 )
-univariate_int_ext_export.start()
+# univariate_int_ext_export.start()
 
 
 ##################################################################################################################################################################
@@ -1052,7 +1024,7 @@ PCA_int_ext_export = ee.batch.Export.image.toAsset(
     maxPixels = int(1e13),
     pyramidingPolicy = {".default": pyramidingPolicy}
 )
-PCA_int_ext_export.start()
+# PCA_int_ext_export.start()
 
 ##################################################################################################################################################################
 # Final image export
