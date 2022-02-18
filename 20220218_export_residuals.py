@@ -5,14 +5,6 @@ import ee
 
 ee.Initialize()
 
-AMF = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN/diversity/AMF_diversity_wCV_folds_data')
-pred = ee.Image('users/johanvandenhoogen/000_SPUN/diversity/AMF_diversityclassifiedImg_wFuturePreds')
-
-fCOfResults = pred.addBands(ee.Image.pixelLonLat()).sampleRegions(collection = AMF,
- 								 geometries = False)
-
-residualsFC = fCOfResults.map(lambda f: f.set('AbsResidual', ee.Number(f.get('AMF_diversity')).subtract(f.get('pred_climate_current')).abs()))
-
 # Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
 def GEE_FC_to_pd(fc):
     result = []
@@ -34,6 +26,22 @@ def GEE_FC_to_pd(fc):
 
     return df
 
-residualsDf = GEE_FC_to_pd(residualsFC)[['AMF_diversity','pred_climate_current','AbsResidual','latitude','longitude']]
-residualsDf
-residualsDf.to_csv('output/AMF_v1_residuals.csv')
+# Taxa
+taxa = ['AMF', 'ECM']
+
+for taxon in taxa:
+
+    # Training data
+    training_data = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN/diversity/'+taxon+'_diversity_wCV_folds_data')
+
+    # Predicted
+    predicted = ee.Image('users/johanvandenhoogen/000_SPUN/diversity/'+taxon+'_diversityclassifiedImg_wFuturePreds')
+
+    fCOfResults = predicted.addBands(ee.Image.pixelLonLat()).sampleRegions(collection = training_data, geometries = False)
+
+    residualsFC = fCOfResults.map(lambda f: f.set('AbsResidual', ee.Number(f.get(taxon+'_diversity')).subtract(f.get('pred_climate_current')).abs()))
+
+    # Convert to pandas
+    residualsDf = GEE_FC_to_pd(residualsFC)[[taxon+'_diversity','pred_climate_current','AbsResidual','latitude','longitude']]
+    # Write to file
+    residualsDf.to_csv('output/'+taxon+'_v1_residuals.csv')
