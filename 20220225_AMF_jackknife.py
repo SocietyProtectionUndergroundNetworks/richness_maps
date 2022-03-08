@@ -481,3 +481,30 @@ loo_cv_fc_export = ee.batch.Export.table.toAsset(
 loo_cv_fc_export.start()
 
 print('Jackkifing started! Moving on...')
+
+# Run the below part when the export is complete (might take >1 day)
+
+# Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
+def GEE_FC_to_pd(fc):
+	result = []
+
+	values = fc.toList(50000).getInfo()
+
+	BANDS = fc.first().propertyNames().getInfo()
+
+	if 'system:index' in BANDS: BANDS.remove('system:index')
+
+	for item in values:
+		values = item['properties']
+		row = [str(values[key]) for key in BANDS]
+		row = ",".join(row)
+		result.append(row)
+
+	df = pd.DataFrame([item.split(",") for item in result], columns = BANDS)
+	df.replace('None', np.nan, inplace = True)
+
+	return df
+
+# Jackkifing results
+df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_jackknifing'))
+df
