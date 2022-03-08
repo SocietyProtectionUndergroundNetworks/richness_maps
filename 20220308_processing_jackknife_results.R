@@ -7,3 +7,10 @@ df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220308_AMF_jackk
   group_by(ID) %>% 
   mutate(across(c(predicted, AMF_diversity), ~ mean(.x, na.rm = TRUE))) %>% #change to summarise if only one record per sample is needed
   mutate(abs_residual = abs(AMF_diversity - predicted))
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220308_ECM_jackknife_results.csv') %>% 
+  mutate(ID = floor(V1/10)) %>% #add pseudo-ID per pixel
+  group_by(ID) %>% 
+  mutate(across(c(predicted, AMF_diversity), ~ mean(.x, na.rm = TRUE))) %>% #change to summarise if only one record per sample is needed
+  mutate(abs_residual = abs(AMF_diversity - predicted))

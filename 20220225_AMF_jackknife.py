@@ -507,4 +507,4 @@ def GEE_FC_to_pd(fc):
 
 # Jackkifing results
 df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_jackknifing'))
-df
+df.to_csv('data/20220308_AMF_jackknife_results.csv')
