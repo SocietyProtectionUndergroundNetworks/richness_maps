@@ -1,8 +1,8 @@
 library(data.table)
 library(tidyverse)
-
+setwd('/Users/johanvandenhoogen/SPUN/richness_maps/')
 # Raw results have 10 predictions per point (pixel); one for each model in the ensemble. Process by taking the mean for each predicted point
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220324_AMF_jackknife_results_envOnly.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220326_AMF_jackknife_results_envOnly.csv') %>% 
   mutate(ID = floor(V1/10)) %>% #add pseudo-ID per pixel
   group_by(ID) %>% 
   mutate(across(c(predicted, AMF_diversity), ~ mean(.x, na.rm = TRUE))) %>% #change to summarise if only one record per sample is needed

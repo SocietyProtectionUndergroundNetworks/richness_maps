@@ -248,6 +248,147 @@ bashCommandList_CreateCollection = [bashFunction_EarthEngine]+arglist_CreateColl
 bashCommandList_CreateFolder = [bashFunction_EarthEngine]+arglist_CreateFolder
 
 ####################################################################################################################################################################
+# Helper functions
+####################################################################################################################################################################
+# Function to convert FeatureCollection to Image
+def fcToImg(f):
+	img = sampledFC.reduceToImage(
+		properties = [f],
+		reducer = ee.Reducer.mean()
+	)
+	return img
+
+# Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
+def GEE_FC_to_pd(fc):
+	result = []
+
+	values = fc.toList(50000).getInfo()
+
+	BANDS = fc.first().propertyNames().getInfo()
+
+	if 'system:index' in BANDS: BANDS.remove('system:index')
+
+	for item in values:
+		values = item['properties']
+		row = [str(values[key]) for key in BANDS]
+		row = ",".join(row)
+		result.append(row)
+
+	df = pd.DataFrame([item.split(",") for item in result], columns = BANDS)
+	df.replace('None', np.nan, inplace = True)
+
+	return df
+
+# Function to add folds stratified per biome
+def assignFolds(biome):
+	fc_filtered = fc_agg.filter(ee.Filter.eq(stratificationVariableString, biome))
+
+	cvFoldsToAssign = ee.List.sequence(0, fc_filtered.size()).map(lambda i: ee.Number(i).mod(k).add(1))
+
+	fc_sorted = fc_filtered.randomColumn(seed = biome).sort('random')
+
+	fc_wCVfolds = ee.FeatureCollection(cvFoldsToAssign.zip(fc_sorted.toList(fc_filtered.size())).map(lambda f: ee.Feature(ee.List(f).get(1)).set(cvFoldString, ee.List(f).get(0))))
+
+	return fc_wCVfolds
+
+# R^2 function
+def coefficientOfDetermination(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the mean of the property of interest
+	propertyOfInterestMean = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).select([propertyOfInterest]).reduceColumns(ee.Reducer.mean(),[propertyOfInterest])).get('mean'))
+
+	# Compute the total sum of squares
+	def totalSoSFunction(f):
+		return f.set('Difference_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(propertyOfInterestMean).pow(ee.Number(2)))
+	totalSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(totalSoSFunction).select(['Difference_Squared']).reduceColumns(ee.Reducer.sum(),['Difference_Squared'])).get('sum'))
+
+	# Compute the residual sum of squares
+	def residualSoSFunction(f):
+		return f.set('Residual_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(ee.Number(ee.Feature(f).get(propertyOfInterest_Predicted))).pow(ee.Number(2)))
+	residualSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(residualSoSFunction).select(['Residual_Squared']).reduceColumns(ee.Reducer.sum(),['Residual_Squared'])).get('sum'))
+
+	# Finalize the calculation
+	r2 = ee.Number(1).subtract(residualSumOfSquares.divide(totalSumOfSquares))
+
+	return ee.Number(r2)
+
+# RMSE function
+def RMSE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the squared difference between observed and predicted
+	def propDiff(f):
+		diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+		return f.set('diff', diff.pow(2))
+
+	# calculate RMSE from squared difference
+	rmse = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean')).sqrt()
+
+	return rmse
+
+# MAE function
+def MAE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the absolute difference between observed and predicted
+	def propDiff(f):
+		diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+		return f.set('diff', diff.abs())
+
+	# calculate MAE from squared difference
+	MAE = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean'))
+
+	return MAE
+
+# Function to take a feature with a classifier of interest
+def computeCVAccuracyAndRMSE(featureWithClassifier):
+	# Pull the classifier from the feature
+	cOI = ee.Classifier(featureWithClassifier.get('c'))
+
+	# Create a function to map through the fold assignments and compute the overall accuracy
+	# for all validation folds
+	def computeAccuracyForFold(foldFeature):
+		# Organize the training and validation data
+
+		foldNumber = ee.Number(ee.Feature(foldFeature).get('Fold'))
+		trainingData = fcOI.filterMetadata(cvFoldString,'not_equals',foldNumber)
+		validationData = fcOI.filterMetadata(cvFoldString,'equals',foldNumber)
+
+		# Train the classifier and classify the validation dataset
+		trainedClassifier = cOI.train(trainingData,classProperty,covariateList)
+		outputtedPropName = classProperty+'_Predicted'
+		classifiedValidationData = validationData.classify(trainedClassifier,outputtedPropName)
+
+		# Compute accuracy metrics
+		r2ToSet = coefficientOfDetermination(classifiedValidationData,classProperty,outputtedPropName)
+		rmseToSet = RMSE(classifiedValidationData,classProperty,outputtedPropName)
+		maeToSet = MAE(classifiedValidationData,classProperty,outputtedPropName)
+		return foldFeature.set('R2',r2ToSet).set('RMSE', rmseToSet).set('MAE', maeToSet)
+
+	# Compute the mean and std dev of the accuracy values of the classifier across all folds
+	accuracyFC = kFoldAssignmentFC.map(computeAccuracyForFold)
+
+	meanAccuracy = accuracyFC.aggregate_mean('R2')
+	sdAccuracy = accuracyFC.aggregate_total_sd('R2')
+
+	# Calculate mean and std dev of RMSE
+	RMSEvals = accuracyFC.aggregate_array('RMSE')
+	RMSEvalsSquared = RMSEvals.map(lambda f: ee.Number(f).multiply(f))
+	sumOfRMSEvalsSquared = RMSEvalsSquared.reduce(ee.Reducer.sum())
+	meanRMSE = ee.Number.sqrt(ee.Number(sumOfRMSEvalsSquared).divide(k))
+
+	RMSEdiff = accuracyFC.aggregate_array('RMSE').map(lambda f: ee.Number(ee.Number(f).subtract(meanRMSE)).pow(2))
+	sumOfRMSEdiff = RMSEdiff.reduce(ee.Reducer.sum())
+	sdRMSE = ee.Number.sqrt(ee.Number(sumOfRMSEdiff).divide(k))
+
+	# Calculate mean and std dev of MAE
+	meanMAE = accuracyFC.aggregate_mean('MAE')
+	sdMAE= accuracyFC.aggregate_total_sd('MAE')
+
+	# Compute the feature to return
+	featureToReturn = featureWithClassifier.select(['cName']).set('Mean_R2',meanAccuracy,'StDev_R2',sdAccuracy, 'Mean_RMSE',meanRMSE,'StDev_RMSE',sdRMSE, 'Mean_MAE',meanMAE,'StDev_MAE',sdMAE)
+	return featureToReturn
+
+
+
+####################################################################################################################################################################
 # Data processing
 ####################################################################################################################################################################
 # Import the raw CSV
@@ -290,7 +431,7 @@ for vps in varsPerSplit_list:
 
 try:
 	# Grid search results as FC
-	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results')
+	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_EnvOnly')
 
 	# Get top model name
 	bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
@@ -310,7 +451,7 @@ except Exception as e:
 	gridSearchExport = ee.batch.Export.table.toAsset(
 		collection = hyperparameter_tuning,
 		description = classProperty+'grid_search_results',
-		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results'
+		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_EnvOnly'
 	)
 	gridSearchExport.start()
 
@@ -326,7 +467,7 @@ except Exception as e:
 	print('Moving on...')
 
 	# Grid search results as FC
-	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results')
+	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_EnvOnly')
 
 ##################################################################################################################################################################
 # Classify image
@@ -478,7 +619,7 @@ loo_cv_fc_export = ee.batch.Export.table.toAsset(
 	description = classProperty+'_jackknifing',
 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/20220324_'+classProperty+'_jackknifing_envOnly'
 )
-# loo_cv_fc_export.start()
+loo_cv_fc_export.start()
 
 print('Jackkifing started! Moving on...')
 

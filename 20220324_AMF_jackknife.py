@@ -20,11 +20,11 @@ usernameFolderString = 'johanvandenhoogen'
 bucketOfInterest = 'johanvandenhoogen'
 
 # Input the name of the classification property
-classProperty = 'AMF_diversity'
+classProperty = 'myco_diversity'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN/diversity'
+projectFolder = '000_SPUN_temp/myco_diversity'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -54,89 +54,71 @@ buffer_size = 0
 # Covariate data settings
 ####################################################################################################################################################################
 
-
-climate_vars = [
-"CHELSA_BIO_Annual_Mean_Temperature",
-"CHELSA_BIO_Annual_Precipitation",
-"CHELSA_BIO_Max_Temperature_of_Warmest_Month",
-"CHELSA_BIO_Precipitation_of_Coldest_Quarter",
-"CHELSA_BIO_Precipitation_Seasonality",
+# List of the covariates to use
+covariateList = [
+	'CGIAR_PET',
+	'CHELSA_BIO_Annual_Mean_Temperature',
+	'CHELSA_BIO_Annual_Precipitation',
+	'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
+	'CHELSA_BIO_Precipitation_Seasonality',
+	'ConsensusLandCover_Human_Development_Percentage',
+	'ConsensusLandCoverClass_Barren',
+	'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+	'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+	'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+	'ConsensusLandCoverClass_Herbaceous_Vegetation',
+	'ConsensusLandCoverClass_Mixed_Other_Trees',
+	'ConsensusLandCoverClass_Shrubs',
+	'EarthEnvTexture_CoOfVar_EVI',
+	'EarthEnvTexture_Correlation_EVI',
+	'EarthEnvTexture_Homogeneity_EVI',
+	'EarthEnvTopoMed_AspectCosine',
+	'EarthEnvTopoMed_AspectSine',
+	'EarthEnvTopoMed_Elevation',
+	'EarthEnvTopoMed_Slope',
+	'EarthEnvTopoMed_TopoPositionIndex',
+	'EsaCci_BurntAreasProbability',
+	'GHS_Population_Density',
+	'GlobBiomass_AboveGroundBiomass',
+	'GlobPermafrost_PermafrostExtent',
+	'MODIS_NPP',
+	'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+	'SG_Depth_to_bedrock',
+	'SG_Sand_Content_005cm',
+	'SG_SOC_Content_005cm',
+	'SG_Soil_pH_H2O_005cm',
 ]
 
-composite_vars = [
-"CGIAR_Aridity_Index",
-"CGIAR_PET",
-"EarthEnvTopoMed_AspectCosine",
-"EarthEnvTopoMed_AspectSine",
-"EarthEnvTopoMed_Elevation",
-"EarthEnvTopoMed_Slope",
-"EarthEnvTopoMed_TopoPositionIndex",
-"EsaCci_BurntAreasProbability",
-"FanEtAl_Depth_to_Water_Table_AnnualMean",
-"GlobPermafrost_PermafrostExtent",
-"PelletierEtAl_SoilAndSedimentaryDepositThicknesses",
-"SG_Depth_to_bedrock",
-"SG_Sand_Content_005cm",
-"SG_SOC_Content_005cm",
-"SG_Soil_pH_H2O_005cm",
-]
-
-landUse_vars = [
-"NET",
-"NDT",
-"BET",
-"BDT",
-"BES",
-"BDS",
-"C3",
-"C4",
-"Crops",
-"Urban",
-"Barren"
-]
-
-project_vars = [
-# 'top',
-# 'bot',
-# 'core_length',
-'target_marker',
-'sequencing_platform',
-'sample_type',
-'primers'
-]
-
-covariateList = climate_vars + composite_vars #+ project_vars
-
-climate_2015 = ee.Image('projects/crowtherlab/t3/CHELSA/CHELSA_BioClim_1994_2013_180ArcSec').select(climate_vars)
-
-# Future climate scenarios
-climate_rcp26_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp26_2050s_mean')
-climate_rcp26_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp26_2070s_mean')
-climate_rcp45_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp45_2050s_mean')
-climate_rcp45_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp45_2070s_mean')
-climate_rcp60_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp60_2050s_mean')
-climate_rcp60_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp60_2070s_mean')
-climate_rcp85_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp85_2050s_mean')
-climate_rcp85_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp85_2070s_mean')
-
-# Future land use
-ssp1_rcp26_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2015_mean_11PFTs')
-ssp1_rcp26_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2060_mean_11PFTs')
-ssp1_rcp26_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2080_mean_11PFTs')
-ssp2_rcp45_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2015_mean_11PFTs')
-ssp2_rcp45_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2060_mean_11PFTs')
-ssp2_rcp45_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2080_mean_11PFTs')
-ssp3_rcp60_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2015_mean_11PFTs')
-ssp3_rcp60_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2060_mean_11PFTs')
-ssp3_rcp60_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2080_mean_11PFTs')
-ssp4_rcp60_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2015_mean_11PFTs')
-ssp4_rcp60_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2060_mean_11PFTs')
-ssp4_rcp60_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2080_mean_11PFTs')
-ssp5_rcp85_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2015_mean_11PFTs')
-ssp5_rcp85_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2060_mean_11PFTs')
-ssp5_rcp85_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2080_mean_11PFTs')
-
-staticCompositeImg = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec').select(composite_vars)
+# climate_2015 = ee.Image('projects/crowtherlab/t3/CHELSA/CHELSA_BioClim_1994_2013_180ArcSec').select(climate_vars)
+#
+# # Future climate scenarios
+# climate_rcp26_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp26_2050s_mean')
+# climate_rcp26_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp26_2070s_mean')
+# climate_rcp45_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp45_2050s_mean')
+# climate_rcp45_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp45_2070s_mean')
+# climate_rcp60_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp60_2050s_mean')
+# climate_rcp60_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp60_2070s_mean')
+# climate_rcp85_2050 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp85_2050s_mean')
+# climate_rcp85_2070 = ee.Image('projects/crowtherlab/t3/CHELSA/Future_BioClim_Ensembles/rcp85_2070s_mean')
+#
+# # Future land use
+# ssp1_rcp26_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2015_mean_11PFTs')
+# ssp1_rcp26_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2060_mean_11PFTs')
+# ssp1_rcp26_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp1_rcp26_2080_mean_11PFTs')
+# ssp2_rcp45_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2015_mean_11PFTs')
+# ssp2_rcp45_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2060_mean_11PFTs')
+# ssp2_rcp45_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp2_rcp45_2080_mean_11PFTs')
+# ssp3_rcp60_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2015_mean_11PFTs')
+# ssp3_rcp60_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2060_mean_11PFTs')
+# ssp3_rcp60_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp3_rcp60_2080_mean_11PFTs')
+# ssp4_rcp60_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2015_mean_11PFTs')
+# ssp4_rcp60_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2060_mean_11PFTs')
+# ssp4_rcp60_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp4_rcp60_2080_mean_11PFTs')
+# ssp5_rcp85_2015_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2015_mean_11PFTs')
+# ssp5_rcp85_2060_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2060_mean_11PFTs')
+# ssp5_rcp85_2080_mean_11PFTs = ee.Image('projects/crowtherlab/t3/GCAM_Demeter/HarmonizedLandUse_11PFTs/ssp5_rcp85_2080_mean_11PFTs')
+#
+# staticCompositeImg = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec').select(composite_vars)
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -151,7 +133,7 @@ k = 10
 kList = list(range(1,k+1))
 
 # Set number of trees in RF models
-nTrees = 500
+nTrees = 250
 
 # Input the name of the property that holds the CV fold assignment
 cvFoldString = 'CV_Fold'
@@ -247,6 +229,146 @@ bashCommandList_Delete = [bashFunction_EarthEngine]+arglist_Delete
 bashCommandList_CreateCollection = [bashFunction_EarthEngine]+arglist_CreateCollection
 bashCommandList_CreateFolder = [bashFunction_EarthEngine]+arglist_CreateFolder
 
+###########################################################################################################################################################
+# Helper functions
+####################################################################################################################################################################
+# Function to convert FeatureCollection to Image
+def fcToImg(f):
+	img = sampledFC.reduceToImage(
+		properties = [f],
+		reducer = ee.Reducer.mean()
+	)
+	return img
+
+# Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
+def GEE_FC_to_pd(fc):
+	result = []
+
+	values = fc.toList(50000).getInfo()
+
+	BANDS = fc.first().propertyNames().getInfo()
+
+	if 'system:index' in BANDS: BANDS.remove('system:index')
+
+	for item in values:
+		values = item['properties']
+		row = [str(values[key]) for key in BANDS]
+		row = ",".join(row)
+		result.append(row)
+
+	df = pd.DataFrame([item.split(",") for item in result], columns = BANDS)
+	df.replace('None', np.nan, inplace = True)
+
+	return df
+
+# Function to add folds stratified per biome
+def assignFolds(biome):
+	fc_filtered = fc_agg.filter(ee.Filter.eq(stratificationVariableString, biome))
+
+	cvFoldsToAssign = ee.List.sequence(0, fc_filtered.size()).map(lambda i: ee.Number(i).mod(k).add(1))
+
+	fc_sorted = fc_filtered.randomColumn(seed = biome).sort('random')
+
+	fc_wCVfolds = ee.FeatureCollection(cvFoldsToAssign.zip(fc_sorted.toList(fc_filtered.size())).map(lambda f: ee.Feature(ee.List(f).get(1)).set(cvFoldString, ee.List(f).get(0))))
+
+	return fc_wCVfolds
+
+# R^2 function
+def coefficientOfDetermination(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the mean of the property of interest
+	propertyOfInterestMean = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).select([propertyOfInterest]).reduceColumns(ee.Reducer.mean(),[propertyOfInterest])).get('mean'))
+
+	# Compute the total sum of squares
+	def totalSoSFunction(f):
+		return f.set('Difference_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(propertyOfInterestMean).pow(ee.Number(2)))
+	totalSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(totalSoSFunction).select(['Difference_Squared']).reduceColumns(ee.Reducer.sum(),['Difference_Squared'])).get('sum'))
+
+	# Compute the residual sum of squares
+	def residualSoSFunction(f):
+		return f.set('Residual_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(ee.Number(ee.Feature(f).get(propertyOfInterest_Predicted))).pow(ee.Number(2)))
+	residualSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(residualSoSFunction).select(['Residual_Squared']).reduceColumns(ee.Reducer.sum(),['Residual_Squared'])).get('sum'))
+
+	# Finalize the calculation
+	r2 = ee.Number(1).subtract(residualSumOfSquares.divide(totalSumOfSquares))
+
+	return ee.Number(r2)
+
+# RMSE function
+def RMSE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the squared difference between observed and predicted
+	def propDiff(f):
+		diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+		return f.set('diff', diff.pow(2))
+
+	# calculate RMSE from squared difference
+	rmse = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean')).sqrt()
+
+	return rmse
+
+# MAE function
+def MAE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+	# Compute the absolute difference between observed and predicted
+	def propDiff(f):
+		diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+		return f.set('diff', diff.abs())
+
+	# calculate MAE from squared difference
+	MAE = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean'))
+
+	return MAE
+
+# Function to take a feature with a classifier of interest
+def computeCVAccuracyAndRMSE(featureWithClassifier):
+	# Pull the classifier from the feature
+	cOI = ee.Classifier(featureWithClassifier.get('c'))
+
+	# Create a function to map through the fold assignments and compute the overall accuracy
+	# for all validation folds
+	def computeAccuracyForFold(foldFeature):
+		# Organize the training and validation data
+
+		foldNumber = ee.Number(ee.Feature(foldFeature).get('Fold'))
+		trainingData = fcOI.filterMetadata(cvFoldString,'not_equals',foldNumber)
+		validationData = fcOI.filterMetadata(cvFoldString,'equals',foldNumber)
+
+		# Train the classifier and classify the validation dataset
+		trainedClassifier = cOI.train(trainingData,classProperty,covariateList)
+		outputtedPropName = classProperty+'_Predicted'
+		classifiedValidationData = validationData.classify(trainedClassifier,outputtedPropName)
+
+		# Compute accuracy metrics
+		r2ToSet = coefficientOfDetermination(classifiedValidationData,classProperty,outputtedPropName)
+		rmseToSet = RMSE(classifiedValidationData,classProperty,outputtedPropName)
+		maeToSet = MAE(classifiedValidationData,classProperty,outputtedPropName)
+		return foldFeature.set('R2',r2ToSet).set('RMSE', rmseToSet).set('MAE', maeToSet)
+
+	# Compute the mean and std dev of the accuracy values of the classifier across all folds
+	accuracyFC = kFoldAssignmentFC.map(computeAccuracyForFold)
+
+	meanAccuracy = accuracyFC.aggregate_mean('R2')
+	sdAccuracy = accuracyFC.aggregate_total_sd('R2')
+
+	# Calculate mean and std dev of RMSE
+	RMSEvals = accuracyFC.aggregate_array('RMSE')
+	RMSEvalsSquared = RMSEvals.map(lambda f: ee.Number(f).multiply(f))
+	sumOfRMSEvalsSquared = RMSEvalsSquared.reduce(ee.Reducer.sum())
+	meanRMSE = ee.Number.sqrt(ee.Number(sumOfRMSEvalsSquared).divide(k))
+
+	RMSEdiff = accuracyFC.aggregate_array('RMSE').map(lambda f: ee.Number(ee.Number(f).subtract(meanRMSE)).pow(2))
+	sumOfRMSEdiff = RMSEdiff.reduce(ee.Reducer.sum())
+	sdRMSE = ee.Number.sqrt(ee.Number(sumOfRMSEdiff).divide(k))
+
+	# Calculate mean and std dev of MAE
+	meanMAE = accuracyFC.aggregate_mean('MAE')
+	sdMAE= accuracyFC.aggregate_total_sd('MAE')
+
+	# Compute the feature to return
+	featureToReturn = featureWithClassifier.select(['cName']).set('Mean_R2',meanAccuracy,'StDev_R2',sdAccuracy, 'Mean_RMSE',meanRMSE,'StDev_RMSE',sdRMSE, 'Mean_MAE',meanMAE,'StDev_MAE',sdMAE)
+	return featureToReturn
+
+
 ####################################################################################################################################################################
 # Data processing
 ####################################################################################################################################################################
@@ -329,93 +451,6 @@ except Exception as e:
 	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results')
 
 ##################################################################################################################################################################
-# Classify image
-##################################################################################################################################################################
-
-# Reference covariate levels for mapping:
-# top: 0
-# bot: 10
-# core.length: 10
-# Sample.type: soil
-# target_marker: Illumina
-# target_marker: ITS2
-# Primers: ITS3/ITS4
-
-# Sample FMS17564v2 has the reference levels:
-# rawPointCollection[rawPointCollection['sampleID'] == 'FMS17564v2']
-
-# platform_id / type_id / primer_id images
-# top = ee.Image.constant(0)
-# bot = ee.Image.constant(10)
-# corelength = ee.Image.constant(10)
-target_marker = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['target_marker']))
-sequencing_platform = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sequencing_platform']))
-sample_type = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sample_type']))
-primers = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['primers']))
-
-# constant_imgs = ee.ImageCollection.fromImages([top, bot, corelength, platform_id, marker_id, type_id, primer_id]).toBands().rename(['top', 'bot', 'corelength', 'platform_id', 'marker_id', 'type_id', 'primer_id'])
-constant_imgs = ee.ImageCollection.fromImages([target_marker, sequencing_platform, sample_type, primers]).toBands().rename(['target_marker', 'sequencing_platform', 'sample_type', 'primers'])
-
-def finalImageClassification(compositeImg):
-	if ensemble == False:
-		# Load the best model from the classifier list
-		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
-
-		# Train the classifier with the collection
-		trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
-
-		# Classify the image
-		classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-
-	if ensemble == True:
-		def classifyImage(classifierName):
-			# Load the best model from the classifier list
-			classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
-
-			# Train the classifier with the collection
-			trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
-
-			# Classify the image
-			classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-
-			return classifiedImage
-
-		# Classify the images, return mean
-		classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
-
-	return classifiedImage
-
-pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-
-compositeList = [pred_climate_current,
-pred_futureClimate_rcp26_2050,
-pred_futureClimate_rcp26_2070,
-pred_futureClimate_rcp45_2050,
-pred_futureClimate_rcp45_2070,
-pred_futureClimate_rcp60_2050,
-pred_futureClimate_rcp60_2070,
-pred_futureClimate_rcp85_2050,
-pred_futureClimate_rcp85_2070]
-
-image_toExport = ee.ImageCollection(list(map(finalImageClassification, compositeList))).toBands().rename(['pred_climate_current',
-'pred_futureClimate_rcp26_2050',
-'pred_futureClimate_rcp26_2070',
-'pred_futureClimate_rcp45_2050',
-'pred_futureClimate_rcp45_2070',
-'pred_futureClimate_rcp60_2050',
-'pred_futureClimate_rcp60_2070',
-'pred_futureClimate_rcp85_2050',
-'pred_futureClimate_rcp85_2070'])
-
-##################################################################################################################################################################
 # Jackkifing
 ##################################################################################################################################################################
 
@@ -476,9 +511,9 @@ loo_cv = fc_toMap.map(func2).flatten()
 loo_cv_fc_export = ee.batch.Export.table.toAsset(
 	collection = loo_cv,
 	description = classProperty+'_jackknifing',
-	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/20220324_'+classProperty+'_jackknifing_envOnly'
+	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/20220325_'+classProperty+'_jackknifing_envOnly'
 )
-# loo_cv_fc_export.start()
+loo_cv_fc_export.start()
 
 print('Jackkifing started! Moving on...')
 
