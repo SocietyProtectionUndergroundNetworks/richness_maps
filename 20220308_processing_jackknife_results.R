@@ -1,8 +1,8 @@
 library(data.table)
 library(tidyverse)
-setwd('/Users/johanvandenhoogen/SPUN/richness_maps/')
+
 # Raw results have 10 predictions per point (pixel); one for each model in the ensemble. Process by taking the mean for each predicted point
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220326_AMF_jackknife_results_envOnly.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220324_AMF_jackknife_results_envOnly.csv') %>% 
   mutate(ID = floor(V1/10)) %>% #add pseudo-ID per pixel
   group_by(ID) %>% 
   mutate(across(c(predicted, AMF_diversity), ~ mean(.x, na.rm = TRUE))) %>% #change to summarise if only one record per sample is needed
@@ -32,3 +32,24 @@ df %>%
   geom_abline() +
   xlim(c(0,500)) + ylim(c(0,500)) +
   xlab('observed')
+
+
+
+
+
+
+# Raw results have 10 predictions per point (pixel); one for each model in the ensemble. Process by taking the mean for each predicted point
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20220326_AMF_jackknife_results_envOnly.csv') %>% 
+  mutate(ID = floor(V1/10)) %>% #add pseudo-ID per pixel
+  group_by(ID) %>% 
+  mutate(across(c(predicted, myco_diversity), ~ mean(.x, na.rm = TRUE))) %>% #change to summarise if only one record per sample is needed
+  mutate(abs_residual = abs(myco_diversity - predicted))
+
+# Quick plot
+df %>% 
+  ggplot(aes(x = myco_diversity, y = predicted)) +
+  geom_point() +
+  geom_smooth(formula = 'y~x', method = 'lm') +
+  geom_abline() +
+  xlim(c(0,180)) + ylim(c(0,180)) +
+  xlab("observed")

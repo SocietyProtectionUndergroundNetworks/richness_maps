@@ -369,21 +369,6 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
 	return featureToReturn
 
 
-####################################################################################################################################################################
-# Data processing
-####################################################################################################################################################################
-# Import the raw CSV
-rawPointCollection = pd.read_csv('data/20211026_AMF_diversity_data_sampled.csv', float_precision='round_trip')
-
-# Rename columnto be mapped
-rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
-
-# Convert factors to integers
-rawPointCollection = rawPointCollection.assign(sequencing_platform = (rawPointCollection['sequencing_platform']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection['sample_type']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_marker']).astype('category').cat.codes)
-
 ##################################################################################################################################################################
 # Hyperparameter tuning
 ##################################################################################################################################################################
@@ -391,7 +376,7 @@ fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+
 
 # Define hyperparameters for grid search
 varsPerSplit_list = list(range(2,8))
-leafPop_list = list(range(4,8))
+leafPop_list = list(range(2,8))
 classifierList = []
 
 # Create list of classifiers
@@ -506,7 +491,7 @@ def func2(f):
 
 # Calculate R2 across range of buffer sizes
 loo_cv = fc_toMap.map(func2).flatten()
-
+loo_cv.first().getInfo()
 # Export FC to assets
 loo_cv_fc_export = ee.batch.Export.table.toAsset(
 	collection = loo_cv,
@@ -541,5 +526,5 @@ def GEE_FC_to_pd(fc):
 	return df
 
 # Jackkifing results
-df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/20220324_'+classProperty+'_jackknifing_envOnly'))
-df.to_csv('data/20220324_AMF_jackknife_results_envOnly.csv')
+df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/20220325_'+classProperty+'_jackknifing_envOnly'))
+df.to_csv('data/20220326_AMF_jackknife_results_envOnly.csv')
