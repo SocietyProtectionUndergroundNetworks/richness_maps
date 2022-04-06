@@ -26,7 +26,7 @@ usernameFolderString = 'johanvandenhoogen'
 bucketOfInterest = 'johanvandenhoogen'
 
 # Input the name of the classification property
-classProperty = 'AMF_diversity'
+classProperty = 'ECM_diversity'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
@@ -414,7 +414,7 @@ time.sleep(normalWaitTime/2)
 # Data processing
 ####################################################################################################################################################################
 # Import the raw CSV
-rawPointCollection = pd.read_csv('data/20211026_AMF_diversity_data_sampled.csv', float_precision='round_trip')
+rawPointCollection = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip')
 
 # Rename columnto be mapped
 rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
