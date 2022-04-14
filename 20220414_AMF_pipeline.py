@@ -18,12 +18,12 @@ import multiprocessing
 ee.Initialize()
 
 covariateSet =[
-# 'wpixelAgg_wProjectVars',
-# 'wpixelAgg_woProjectVars',
+'wpixelAgg_wProjectVars',
+'wpixelAgg_woProjectVars',
 'wopixelAgg_wProjectVars',
 'wopixelAgg_woProjectVars',
-# 'distictObs_wProjectVars',
-# 'distictObs_woProjectVars',
+'distictObs_wProjectVars',
+'distictObs_woProjectVars',
 ]
 
 def pipeline(setup):
@@ -38,7 +38,7 @@ def pipeline(setup):
     bucketOfInterest = 'johanvandenhoogen'
 
     # Input the name of the classification property
-    classProperty = 'ECM_diversity'
+    classProperty = 'AMF_diversity'
 
     # Input the name of the project folder inside which all of the assets will be stored
     # This folder will be generated automatically below, if it isn't yet present
@@ -415,7 +415,7 @@ def pipeline(setup):
     # Data processing
     ####################################################################################################################################################################
     # Import the raw CSV
-    rawPointCollection = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20211026_AMF_diversity_data_sampled.csv', float_precision='round_trip')
 
     # Rename columnto be mapped
     rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
@@ -524,7 +524,7 @@ def pipeline(setup):
 
     try:
         # Grid search results as FC
-        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
+        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results')
 
         # Get top model name
         bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
@@ -544,7 +544,7 @@ def pipeline(setup):
     #     gridSearchExport = ee.batch.Export.table.toAsset(
     #     	collection = hyperparameter_tuning,
     #     	description = classProperty+'grid_search_results',
-    #     	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation'
+    #     	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results'
     #     )
     #     gridSearchExport.start()
     #
@@ -560,7 +560,7 @@ def pipeline(setup):
     #     print('Moving on...')
     #
     #     # Grid search results as FC
-    #     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation')
+    #     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results')
 
         # Make a feature collection from the k-fold assignment list
         kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
@@ -600,7 +600,7 @@ def pipeline(setup):
         print('Everything is uploaded; moving on...')
 
         # Upload the file into Earth Engine as a table asset
-        assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation'
+        assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results'
         earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_tmp.csv']+arglist_postEEUploadTable
         subprocess.run(earthEngineUploadTableCommands)
         print('Upload to EE queued!')
@@ -620,7 +620,7 @@ def pipeline(setup):
         print('Moving on...')
 
         # Grid search results as FC
-        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
+        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results')
 
     # # Write grid search results to csv
     # GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv('output/'+classProperty+'_grid_search_results.csv')
@@ -755,7 +755,7 @@ def pipeline(setup):
     # predObs_df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'predicted_observed'))
     predObs_df = GEE_FC_to_pd(predObs_wResiduals)
     predObs_df = predObs_df[predObs_df.select_dtypes(include='object').columns].astype("float")
-    predObs_df.to_csv('output/20220411_'+classProperty+'_pred_obs_'+setup+'.csv')
+    predObs_df.to_csv('output/20220414_'+classProperty+'_pred_obs_'+setup+'.csv')
 
     ##################################################################################################################################################################
     # Jackkifing
