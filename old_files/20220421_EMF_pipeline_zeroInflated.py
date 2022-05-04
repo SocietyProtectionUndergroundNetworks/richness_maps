@@ -20,9 +20,9 @@ ee.Initialize()
 covariateSet =[
 # 'wpixelAgg_wProjectVars',
 # 'wpixelAgg_woProjectVars',
-'wopixelAgg_wProjectVars',
-'wopixelAgg_woProjectVars',
-# 'distictObs_wProjectVars',
+# 'wopixelAgg_wProjectVars',
+# 'wopixelAgg_woProjectVars',
+'distictObs_wProjectVars',
 # 'distictObs_woProjectVars',
 ]
 
@@ -158,7 +158,7 @@ def pipeline(setup):
     kList = list(range(1,k+1))
 
     # Set number of trees in RF models
-    nTrees = 100
+    nTrees = 250
 
     # Input the name of the property that holds the CV fold assignment
     cvFoldString = 'CV_Fold'
@@ -499,13 +499,13 @@ def pipeline(setup):
     ##################################################################################################################################################################
     # Hyperparameter tuning
     ##################################################################################################################################################################
-    fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+    # fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
     # Define hyperparameters for grid search
-    varsPerSplit_list = list(range(2,8))
-    leafPop_list = list(range(4,8))
-    classifierList = []
+    varsPerSplit_list = list(range(2,6))# for testing only!!!
+    leafPop_list = list(range(4,7))# for testing only!!!
 
+    classifierListRegression = []
     # Create list of classifiers
     for vps in varsPerSplit_list:
     	for lp in leafPop_list:
@@ -520,73 +520,80 @@ def pipeline(setup):
     		seed = 42
     		).setOutputMode('REGRESSION'))
 
-    		classifierList.append(rf)
+    		classifierListRegression.append(rf)
 
+    classifierListProbability = []
+    # Create list of classifiers
+    for vps in varsPerSplit_list:
+    	for lp in leafPop_list:
+
+    		model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp)
+
+    		rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
+    		numberOfTrees = nTrees,
+    		variablesPerSplit = vps,
+    		minLeafPopulation = lp,
+    		bagFraction = 0.632,
+    		seed = 42
+    		).setOutputMode('CLASSIFICATION'))
+
+    		classifierListProbability.append(rf)
     try:
         # Grid search results as FC
-        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
+        grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression')
+        grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Probability')
 
         # Get top model name
-        bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
+        bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
+        bestModelNameProbability = grid_search_resultsProbability.limit(1, 'Mean_R2', False).first().get('cName')
 
         # Get top 10 models
-        top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
+        top_10ModelsRegression = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
+        top_10ModelsProbability = grid_search_resultsProbability.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
-        len(grid_search_results.first().getInfo())
+        len(grid_search_resultsRegression.first().getInfo())
+        len(grid_search_resultsProbability.first().getInfo())
+
     except Exception as e:
-    #     # Make a feature collection from the k-fold assignment list
-    #     kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
-    #
-    #     # Perform grid search
-    #     hyperparameter_tuning = ee.FeatureCollection(list(map(computeCVAccuracyAndRMSE,classifierList)))
-    #
-    #     # Export to assets
-    #     gridSearchExport = ee.batch.Export.table.toAsset(
-    #     	collection = hyperparameter_tuning,
-    #     	description = classProperty+'grid_search_results',
-    #     	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation'
-    #     )
-    #     gridSearchExport.start()
-    #
-    #     # !! Break and wait
-    #     count = 1
-    #     while count >= 1:
-    #     	taskList = [str(i) for i in ee.batch.Task.list()]
-    #     	subsetList = [s for s in taskList if classProperty in s]
-    #     	subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-    #     	count = len(subsubList)
-    #     	print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for grid search to complete...')
-    #     	time.sleep(normalWaitTime)
-    #     print('Moving on...')
-    #
-    #     # Grid search results as FC
-    #     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation')
-
         # Make a feature collection from the k-fold assignment list
         kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
 
-        classDf = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
+        classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
+        classDfProbability = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
 
-        for rf in classifierList:
-            print('Testing model', classifierList.index(rf), 'out of total of', len(classifierList))
+        for rf in classifierListRegression:
+            print('Testing model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression))
+
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments).filter(ee.Filter.neq(classProperty, 0)) #  train classifier only on data not equalling zero
+            # fcOI = fcOI.limit(100) # ofr testing only!
+            accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
+
+            classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
+
+        for rf in classifierListProbability:
+            print('Testing model', classifierListProbability.index(rf), 'out of total of', len(classifierListProbability))
+
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+            fcOI = fcOI.map(lambda f: f.set('ECM_diversity', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+            # fcOI = fcOI.limit(100) # ofr testing only!
 
             accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 
-            classDf = classDf.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
+            classDfProbability = classDfProbability.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
 
-        classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
-
-        print('Top 5 grid search results:\n', classDfSorted.head(5))
-
-        bestModelName = classDfSorted.iloc[0]['cName']
-
-        print('Best model:', bestModelName)
+        classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
+        classDfSortedProbability = classDfProbability.sort_values([sort_acc_prop], ascending = False) #Sorting PROBABILITY model by R2 doens't make sense - test accuracy instead
 
         # Write model results to csv
-        classDfSorted.to_csv('output/'+classProperty+setup+'_grid_search_results_tmp.csv', index=False)
+        classDfSortedRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression.csv', index=False)
+        classDfSortedProbability.to_csv('output/'+classProperty+setup+'_grid_search_results_Probability.csv', index=False)
 
         # Format the bash call to upload the file to the Google Cloud Storage bucket
-        gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_tmp.csv']+[formattedBucketOI]
+        gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_Regression.csv']+[formattedBucketOI]
+        subprocess.run(gsutilBashUploadList)
+        print('grid_search_results'+' uploaded to a GCSB!')
+
+        gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_Probability.csv']+[formattedBucketOI]
         subprocess.run(gsutilBashUploadList)
         print('grid_search_results'+' uploaded to a GCSB!')
 
@@ -594,14 +601,22 @@ def pipeline(setup):
         time.sleep(normalWaitTime/2)
 
         # Wait for the GSUTIL uploading process to finish before moving on
-        while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_tmp']):
+        while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_Regression']):
+            print('Not everything is uploaded...')
+            time.sleep(normalWaitTime)
+        print('Everything is uploaded; moving on...')
+
+        while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_Probability']):
             print('Not everything is uploaded...')
             time.sleep(normalWaitTime)
         print('Everything is uploaded; moving on...')
 
         # Upload the file into Earth Engine as a table asset
-        assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation'
-        earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_tmp.csv']+arglist_postEEUploadTable
+        assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression'
+        earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Regression.csv']+arglist_postEEUploadTable
+        subprocess.run(earthEngineUploadTableCommands)
+        assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Probability'
+        earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Probability.csv']+arglist_postEEUploadTable
         subprocess.run(earthEngineUploadTableCommands)
         print('Upload to EE queued!')
 
@@ -620,13 +635,29 @@ def pipeline(setup):
         print('Moving on...')
 
         # Grid search results as FC
-        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
+        grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression')
+        grid_search_resultsProbability = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Probability')
+
+        # Get top model name
+        bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
+        bestModelNameProbability = grid_search_resultsProbability.limit(1, 'Mean_R2', False).first().get('cName')
+
+        # Get top 10 models
+        top_10ModelsRegression = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
+        top_10ModelsProbability = grid_search_resultsProbability.limit(10, 'Mean_R2', False).aggregate_array('cName')
+
+        print('Moving on...')
 
     # # Write grid search results to csv
     # GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv('output/'+classProperty+'_grid_search_results.csv')
 
     ##################################################################################################################################################################
-    # Classify image
+    # Classify image > PROBABILITY
+    ##################################################################################################################################################################
+
+
+    ##################################################################################################################################################################
+    # Classify image > REGRESSION
     ##################################################################################################################################################################
     # Reference covariate levels for mapping:
     # top: 0
@@ -654,18 +685,30 @@ def pipeline(setup):
     def finalImageClassification(compositeImg):
         if ensemble == False:
         	# Load the best model from the classifier list
-        	classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+        	classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
+        	classifierProbability = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListProbability).filterMetadata('cName', 'equals', bestModelNameProbability).first()).get('c'))
 
         	# Train the classifier with the collection
-        	trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+            # REGRESSION
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments).filter(ee.Filter.neq(classProperty, 0)) #  train classifier only on data not equalling zero
+        	trainedClassiferRegression = classifierRegression.train(fcOI, classProperty, covariateList)
+
+            # PROBABILITY
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+            fcOI = fcOI.map(lambda f: f.set('ECM_diversity', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+        	trainedClassiferProbability = classifierProbability.train(fcOI, classProperty, covariateList)
 
         	# Classify the image
-        	classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
+        	classifiedImageRegression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Predicted')
+        	classifiedImageProbability = compositeImg.classify(trainedClassiferProbability,classProperty+'_Predicted')
+
+            classifiedImage =
 
         if ensemble == True:
         	def classifyImage(classifierName):
         		# Load the best model from the classifier list
-        		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+            	classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+            	classifierProbability = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListProbability).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
         		# Train the classifier with the collection
         		trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
@@ -679,6 +722,17 @@ def pipeline(setup):
         	classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
 
         return classifiedImage
+
+
+
+classifiedImageProbability.sampleRegions(
+	collection = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments).filter(ee.Filter.eq('ECM_diversity', 0)),
+	properties = [classProperty],
+	scale = 927.6624232772797,
+	tileScale = 16,
+	geometries = False).limit(10).getInfo()
+
+
 
 
     # imgExport = ee.batch.Export.image.toAsset(
@@ -755,7 +809,7 @@ def pipeline(setup):
     # predObs_df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'predicted_observed'))
     predObs_df = GEE_FC_to_pd(predObs_wResiduals)
     predObs_df = predObs_df[predObs_df.select_dtypes(include='object').columns].astype("float")
-    predObs_df.to_csv('output/20220411_'+classProperty+'_pred_obs_'+setup+'.csv')
+    predObs_df.to_csv('output/20220414_'+classProperty+'_pred_obs_'+setup+'.csv')
 
     ##################################################################################################################################################################
     # Jackkifing

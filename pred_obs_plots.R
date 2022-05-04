@@ -53,20 +53,93 @@ df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220411_ECM_div
           mutate(setup = 'wpixelAgg_wProjectVars')) 
 
 df %>% 
-  # group_by(Pixel_Lat, Pixel_Long, setup) %>%
-  # summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(ECM_diversity = median(ECM_diversity), ECM_diversity_Predicted = median(ECM_diversity_Predicted)) %>%
+  # mutate(ECM_diversity_Predicted = ECM_diversity_Predicted + 0.001,
+  #        ECM_diversity = ECM_diversity + 0.001) %>% 
   ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
-  stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
   geom_point(aes(color = setup)) +
   scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
   xlim(c(0,30000)) + ylim(c(0,30000)) +
   geom_abline() +
   geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
   facet_wrap(vars(setup)) +
+  # scale_x_log10() + scale_y_log10() +
   theme_minimal() +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(
+    title = "Median per pixel",
+    # subtitle = "Summary statistics for NDVI, Npp and PET",
+    y = "Predicted EMF Richness", x = "Observed EMF Richness")
 
 
+
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_distictObs_woProjectVars.csv') %>% 
+  mutate(setup = 'distictObs_woProjectVars') %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_distictObs_wProjectVars.csv') %>% 
+          mutate(setup = 'distictObs_wProjectVars')) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_wopixelAgg_woProjectVars.csv') %>% 
+          mutate(setup = 'wopixelAgg_woProjectVars')) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_wopixelAgg_wProjectVars.csv') %>% 
+          mutate(setup = 'wopixelAgg_wProjectVars')) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_wpixelAgg_woProjectVars.csv') %>% 
+          mutate(setup = 'wpixelAgg_woProjectVars')) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220414_AMF_diversity_pred_obs_wpixelAgg_wProjectVars.csv') %>% 
+          mutate(setup = 'wpixelAgg_wProjectVars')) 
+
+df %>% 
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(AMF_diversity = mean(AMF_diversity), AMF_diversity_Predicted = mean(AMF_diversity_Predicted)) %>%
+  # mutate(AMF_diversity_Predicted = AMF_diversity_Predicted + 0.001,
+  #        AMF_diversity = AMF_diversity + 0.001) %>% 
+  ggplot(aes(x = AMF_diversity, y = AMF_diversity_Predicted)) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  geom_point(aes(color = setup)) +
+  scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
+  xlim(c(0,180)) + ylim(c(0,180)) +
+  geom_abline() +
+  geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
+  facet_wrap(vars(setup)) +
+  theme_minimal() +
+  scale_x_log10() + scale_y_log10() +
+  theme(legend.position = "none") +
+  labs(
+    title = "Nean per pixel",
+    # subtitle = "Summary statistics for NDVI, Npp and PET",
+    y = "Predicted AMF Richness", x = "Observed AMF Richness")
+
+
+
+
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220425_ECM_diversity_pred_obs_distictObs_wProjectVars_logTransformed.csv') %>% 
+  mutate(setup = 'distictObs_wProjectVars') 
+
+df %>% 
+  # group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  # summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  geom_point(aes(color = setup)) +
+  scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
+  xlim(c(0,40000)) + ylim(c(0,40000)) +
+  geom_abline() +
+  geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
+  # facet_wrap(vars(setup)) +
+  theme_minimal() +
+  scale_x_log10() + scale_y_log10() +
+  theme(legend.position = "none") +
+  labs(
+    title = "Mean per pixel",
+    # subtitle = "Summary statistics for NDVI, Npp and PET",
+    y = "Predicted EMF Richness", x = "Observed EMF Richness")
+
+
+hist(log(df$ECM_diversity + 1, base = 10))
 
 # Source of "stat_smooth_func" and "StatSmoothFunc": https://gist.github.com/kdauria/524eade46135f6348140
 # Slightly modified 
