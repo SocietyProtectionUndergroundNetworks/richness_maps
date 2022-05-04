@@ -18,12 +18,12 @@ import multiprocessing
 ee.Initialize()
 
 covariateSet =[
-# 'wpixelAgg_wProjectVars',
-# 'wpixelAgg_woProjectVars',
-# 'wopixelAgg_wProjectVars',
-# 'wopixelAgg_woProjectVars',
+'wpixelAgg_wProjectVars',
+'wpixelAgg_woProjectVars',
+'wopixelAgg_wProjectVars',
+'wopixelAgg_woProjectVars',
 'distictObs_wProjectVars',
-# 'distictObs_woProjectVars',
+'distictObs_woProjectVars',
 ]
 
 
@@ -159,7 +159,7 @@ def pipeline(setup):
 	kList = list(range(1,k+1))
 
 	# Set number of trees in RF models
-	nTrees = 100
+	nTrees = 250
 
 	# Input the name of the property that holds the CV fold assignment
 	cvFoldString = 'CV_Fold'
@@ -269,15 +269,20 @@ def pipeline(setup):
 		if 'system:index' in BANDS: BANDS.remove('system:index')
 
 		for item in values:
-			values = item['properties']
-			row = [str(values[key]) for key in BANDS]
-			row = ",".join(row)
+			values_item = item['properties']
+			row = [values_item[key] for key in BANDS]
 			result.append(row)
 
-		df = pd.DataFrame([item.split(",") for item in result], columns = BANDS)
+		df = pd.DataFrame([item for item in result], columns = BANDS)
 		df.replace('None', np.nan, inplace = True)
 
 		return df
+
+	# Add point coordinates to FC as properties
+	def addLatLon(f):
+		lat = f.geometry().coordinates().get(1)
+		lon = f.geometry().coordinates().get(0)
+		return f.set(latString, lat).set(longString, lon)
 
 	# R^2 function
 	def coefficientOfDetermination(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
@@ -411,7 +416,7 @@ def pipeline(setup):
 	print('Original Collection', rawPointCollection.shape[0])
 
 	# Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-	fcToAggregate = rawPointCollection.sample(frac=1).reset_index(drop=True)
+	fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
 
 	# Remove duplicates or pixel aggregate
 	if pixel_agg == True:
@@ -661,6 +666,21 @@ def pipeline(setup):
 
 		return classifiedImage
 
+	# Create appropriate composite image with bands to use
+	if setup == 'wpixelAgg_wProjectVars':
+		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+	if setup == 'wpixelAgg_woProjectVars':
+		compositeToClassify = compositeOfInterest
+	if setup == 'wopixelAgg_wProjectVars':
+		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+	if setup == 'wopixelAgg_woProjectVars':
+		compositeToClassify = compositeOfInterest
+	if setup == 'distictObs_wProjectVars':
+		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+	if setup == 'distictObs_woProjectVars':
+		compositeToClassify = compositeOfInterest
+
+	# image_toExport = finalImageClassification(compositeToClassify)
 
 	# imgExport = ee.batch.Export.image.toAsset(
 	#     image = image_toExport.toFloat(),
@@ -680,27 +700,12 @@ def pipeline(setup):
 	##################################################################################################################################################################
 	##################################################################################################################################################################
 	##################################################################################################################################################################
-	# TEMP - we actually only really care about predicted-observed
-	if setup == 'wpixelAgg_wProjectVars':
-		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-	if setup == 'wpixelAgg_woProjectVars':
-		compositeToClassify = compositeOfInterest
-	if setup == 'wopixelAgg_wProjectVars':
-		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-	if setup == 'wopixelAgg_woProjectVars':
-		compositeToClassify = compositeOfInterest
-	if setup == 'distictObs_wProjectVars':
-		compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-	if setup == 'distictObs_woProjectVars':
-		compositeToClassify = compositeOfInterest
-
-
-	# compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-	# compositeToClassify = compositeOfInterest
-
 	##################################################################################################################################################################
 	# Predicted - Observed
 	##################################################################################################################################################################
+
+	# TEMP - we actually only really care about predicted-observed
+
 	# Retrieve predicted values from training locations
 	# Add Pixel_Lat and Pixel_Long as bands to image
 	def predObsClassification(fcOI):
@@ -732,17 +737,14 @@ def pipeline(setup):
 
 		return classifiedFC
 
+	# Classify FC
 	predObs = predObsClassification(fcOI)
 
-	# Add residuals
+	# Add coordinates to FC
+	predObs = predObs.map(addLatLon)
+
+	# Add residuals to FC
 	predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
-
-	def addLatLon(f):
-		lat = f.geometry().coordinates().get(1)
-		lon = f.geometry().coordinates().get(0)
-		return f.set('lat', lat).set('lon', lon)
-
-	points.map(addLatLon)
 
 	# Export to Assets
 	# predObsexport = ee.batch.Export.table.toAsset(
@@ -764,84 +766,18 @@ def pipeline(setup):
 	# print('Moving on...')
 
 	# Convert to pandas DataFrame
-	# predObs_df = GEE_FC_to_pd(ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'predicted_observed'))
 	predObs_df = GEE_FC_to_pd(predObs_wResiduals)
-	for col in [i for i in predObs_df.columns if i not in ['sample_id']]:
-	    predObs_df[col]=predObs_df[col].astype(float)
-	predObs_df = predObs_df.groupby('sample_id', as_index = False).mean()
 
+	# back-log transform predicted and observed values
 	predObs_df[classProperty+'_Predicted'] = np.exp(predObs_df[classProperty+'_Predicted']) - 1
 	predObs_df[classProperty] = np.exp(predObs_df[classProperty]) - 1
 	predObs_df['AbsResidual'] = np.exp(predObs_df['AbsResidual'])
-	predObs_df.to_csv('output/20220425_'+classProperty+'_pred_obs_'+setup+'_logTransformed.csv')
 
-	##################################################################################################################################################################
-	# Jackkifing
-	##################################################################################################################################################################
-	#
-	# # Set number of repetitions
-	# n_reps = 10
-	# nList = list(range(0,n_reps))
-	#
-	# fc_toMap = ee.FeatureCollection(ee.List(nList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('rep',n)))
-	#
-	# # Helper function 2: Spatial Leave One Out cross-validation function:
-	# def LOOcv(f):
-	# 	# Get iteration ID
-	# 	rep = f.get('rep')
-	#
-	# 	# Test feature
-	# 	testFeature = ee.FeatureCollection(f)
-	#
-	# 	# Training FeatureCollection: all samples not within geometry of test feature
-	# 	trainFC = fcOI.filter(ee.Filter.geometry(testFeature).Not())
-	#
-	# 	if ensemble == False:
-	# 		# Classifier to test: same hyperparameter settings as top model from grid search procedure
-	# 		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
-	#
-	# 	if ensemble == True:
-	# 		# Classifiers to test: top 10 models from grid search hyperparameter tuning
-	# 		classifierName = top_10Models.get(rep)
-	# 		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
-	#
-	# 	# Train classifier
-	# 	trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
-	#
-	# 	# Apply classifier
-	# 	classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
-	#
-	# 	# Get predicted value
-	# 	predicted = classified.first().get('predicted')
-	#
-	# 	# Set predicted value to feature
-	# 	return f.set('predicted', predicted).copyProperties(f)
-	#
-	# # Helper function 3: R2 calculation function
-	# def func2(f):
-	# 	rep = f.get('rep')
-	#
-	# 	# Add the iteration ID to the FC
-	# 	fc_toValidate = fcOI.map(lambda f: f.set('rep', rep))
-	#
-	# 	# Apply leave one out CV function
-	# 	predicted = fc_toValidate.map(LOOcv)
-	#
-	# 	return predicted
-	#
-	# # Calculate R2 across range of buffer sizes
-	# loo_cv = fc_toMap.map(func2).flatten()
-	#
-	# # Export FC to assets
-	# loo_cv_fc_export = ee.batch.Export.table.toAsset(
-	# 	collection = loo_cv,
-	# 	description = classProperty+'_jackknifing',
-	# 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/20220324_'+classProperty+'_jackknifing_envOnly'
-	# )
-	# loo_cv_fc_export.start()
-	#
-	# print('Jackkifing started! Moving on...')
-	#
+	# Group by sample ID to return mean across ensemble prediction
+	predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+	# Write to file
+	predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_'+setup+'_logTransformed.csv')
+
 	# ##################################################################################################################################################################
 	# # Variable importance metrics
 	# ##################################################################################################################################################################
@@ -899,472 +835,471 @@ def pipeline(setup):
 	#
 	# print('Variable importance metrics complete! Moving on...')
 
-	##################################################################################################################################################################
-	# Bootstrapping
-	##################################################################################################################################################################
-	'''
-	# Input the number of points to use for each bootstrap model: equal to number of observations in training dataset
-	bootstrapModelSize = preppedCollection.shape[0]
+	# ##################################################################################################################################################################
+	# # Bootstrapping
+	# ##################################################################################################################################################################
+	# # Input the number of points to use for each bootstrap model: equal to number of observations in training dataset
+	# bootstrapModelSize = preppedCollection.shape[0]
+	#
+	# # Run a for loop to create multiple bootstrap iterations and upload them to the Google Cloud Storage Bucket
+	# # Create an empty list to store all of the file name strings being uploaded (for later use)
+	# fileNameList = []
+	# for n in seedsToUseForBootstrapping:
+	# 	# Perform the subsetting
+	# 	stratSample = preppedCollection.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
+	#
+	# 	# Format the title of the CSV and export it to a holding location
+	# 	titleOfBootstrapCSV = fileNameHeader+str(n).zfill(3)
+	# 	fileNameList.append(titleOfBootstrapCSV)
+	#
+	# # Load the best model from the classifier list
+	# classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
+	#
+	# # Create empty list to store all fcs
+	# fcList = []
+	# # Run a for loop to create multiple bootstrap iterations
+	# for n in seedsToUseForBootstrapping:
+	#
+	# 	# Format the title of the CSV and export it to a holding location
+	# 	titleOfColl = fileNameHeader+str(n).zfill(3)
+	# 	collectionPath = 'users/'+usernameFolderString+'/'+projectFolder+'/'+bootstrapCollFolder+'/'+titleOfColl
+	#
+	# 	# Load the collection from the path
+	# 	fcToTrain = ee.FeatureCollection(collectionPath)
+	#
+	# 	# Append fc to list
+	# 	fcList.append(fcToTrain)
+	#
+	# pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	# pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
+	#
+	# compositeList = [pred_climate_current,
+	# pred_futureClimate_rcp26_2050,
+	# pred_futureClimate_rcp26_2070,
+	# pred_futureClimate_rcp45_2050,
+	# pred_futureClimate_rcp45_2070,
+	# pred_futureClimate_rcp60_2050,
+	# pred_futureClimate_rcp60_2070,
+	# pred_futureClimate_rcp85_2050,
+	# pred_futureClimate_rcp85_2070]
+	#
+	# names = ['climate_current',
+	# 'futureClimate_rcp26_2050',
+	# 'futureClimate_rcp26_2070',
+	# 'futureClimate_rcp45_2050',
+	# 'futureClimate_rcp45_2070',
+	# 'futureClimate_rcp60_2050',
+	# 'futureClimate_rcp60_2070',
+	# 'futureClimate_rcp85_2050',
+	# 'futureClimate_rcp85_2070']
+	#
+	# dictToBoostrap = {compositeList[i]: names[i] for i in range(len(names))}
+	#
+	# for key, value in dictToBoostrap.items():
+	# 	composite = key
+	#
+	# 	# Helper fucntion to train a RF classifier and classify the composite image
+	# 	def bootstrapFunc(fc):
+	# 		# Train the classifier with the collection
+	# 		trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
+	#
+	# 		# Classify the image
+	# 		classifiedImage = composite.classify(trainedClassifer,classProperty+'_Predicted')
+	#
+	# 		return classifiedImage
+	#
+	#
+	# 	# Reduce bootstrap images to mean
+	# 	meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+	# 		reducer = ee.Reducer.mean()
+	# 	)
+	#
+	# 	# Reduce bootstrap images to lower and upper CIs
+	# 	upperLowerCIImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+	# 		reducer = ee.Reducer.percentile([2.5,97.5],['lower','upper'])
+	# 	)
+	#
+	# 	# Reduce bootstrap images to standard deviation
+	# 	stdDevImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
+	# 		reducer = ee.Reducer.stdDev()
+	# 	)
+	#
+	# 	imageToExport = ee.Image.cat(meanImage,
+	# 		upperLowerCIImage,
+	# 		stdDevImage).rename(['bootstrapped_mean_'+value,
+	# 							 'bootstrapped_lower_'+value,
+	# 							 'bootstrapped_upper_'+value,
+	# 							 'bootstrapped_stdDev_'+value])
+	#
+	# 	boostrapExport = ee.batch.Export.image.toAsset(
+	# 		image = imageToExport.toFloat(),
+	# 		description = classProperty+'_bootstrapped_'+value,
+	# 		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_bootstrapped_'+value,
+	# 		crs = 'EPSG:4326',
+	# 		crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+	# 		region = exportingGeometry,
+	# 		maxPixels = int(1e13),
+	# 		pyramidingPolicy = {".default": pyramidingPolicy}
+	# 	)
+	# 	boostrapExport.start()
+	#
+	# ##################################################################################################################################################################
+	# # Univariate int-ext analysis
+	# ##################################################################################################################################################################
+	# # Create a feature collection with only the values from the image bands
+	# fcForMinMax = fcOI.select(covariateList)
+	#
+	# def univariateIntExt(composite):
+	# 	compositeForIntExt = composite.addBands(constant_imgs).select(covariateList).reproject(composite.projection())
+	#
+	# 	# Make a FC with the band names
+	# 	fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
+	#
+	# 	def calcMinMax(f):
+	# 	  bandBeingComputed = f.get('BandName')
+	# 	  maxValueToSet = fcForMinMax.reduceColumns(ee.Reducer.minMax(),[bandBeingComputed])
+	# 	  return f.set('MinValue',maxValueToSet.get('min')).set('MaxValue',maxValueToSet.get('max'))
+	#
+	# 	# Map function
+	# 	fcWithMinMaxValues = ee.FeatureCollection(fcWithBandNames).map(calcMinMax)
+	#
+	# 	# Make two images from these values (a min and a max image)
+	# 	maxValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MaxValue'))
+	# 	maxDict = ee.Dictionary.fromLists(covariateList,maxValuesWNulls)
+	# 	minValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MinValue'))
+	# 	minDict = ee.Dictionary.fromLists(covariateList,minValuesWNulls)
+	# 	minImage = minDict.toImage()
+	# 	maxImage = maxDict.toImage()
+	#
+	# 	totalBandsBinary = compositeForIntExt.gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
+	# 	univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeForIntExt.bandNames().length()).rename('univariate_pct_int_ext')
+	#
+	# 	return univariate_int_ext_image
+	#
+	# univariate_int_ext_image = ee.ImageCollection.fromImages(list(map(univariateIntExt, compositeList))).toBands().rename(['int_ext_current',
+	# 'int_ext_rcp26_2050',
+	# 'int_ext_rcp26_2070',
+	# 'int_ext_rcp45_2050',
+	# 'int_ext_rcp45_2070',
+	# 'int_ext_rcp60_2050',
+	# 'int_ext_rcp60_2070',
+	# 'int_ext_rcp85_2050',
+	# 'int_ext_rcp85_2070'])
+	#
+	# univariate_int_ext_export = ee.batch.Export.image.toAsset(
+	# 	image = univariate_int_ext_image.toFloat(),
+	# 	description = classProperty+'_univariate_int_ext',
+	# 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_univariate_int_ext',
+	# 	crs = 'EPSG:4326',
+	# 	crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+	# 	region = exportingGeometry,
+	# 	maxPixels = int(1e13),
+	# 	pyramidingPolicy = {".default": pyramidingPolicy}
+	# )
+	# # univariate_int_ext_export.start()
+	#
+	#
+	# ##################################################################################################################################################################
+	# # Multivariate (PCA) int-ext analysis
+	# ##################################################################################################################################################################
+	#
+	# # Input the proportion of variance that you would like to cover
+	# propOfVariance = 90
+	#
+	# def PCA_int_extFunc(compositeForIntExt):
+	#
+	# 	# PCA interpolation/extrapolation helper function
+	# 	def assessExtrapolation(fcOfInterest, propOfVariance):
+	# 		# Compute the mean and standard deviation of each band, then standardize the point data
+	# 		meanVector = fcOfInterest.mean()
+	# 		stdVector = fcOfInterest.std()
+	# 		standardizedData = (fcOfInterest-meanVector)/stdVector
+	#
+	# 		# Then standardize the composite from which the points were sampled
+	# 		meanList = meanVector.tolist()
+	# 		stdList = stdVector.tolist()
+	# 		bandNames = list(meanVector.index)
+	# 		meanImage = ee.Image(meanList).rename(bandNames)
+	# 		stdImage = ee.Image(stdList).rename(bandNames)
+	# 		standardizedImage = compositeForIntExt.subtract(meanImage).divide(stdImage)
+	#
+	# 		# Run a PCA on the point samples
+	# 		pcaOutput = PCA()
+	# 		pcaOutput.fit(standardizedData)
+	#
+	# 		# Save the cumulative variance represented by each PC
+	# 		cumulativeVariance = np.cumsum(np.round(pcaOutput.explained_variance_ratio_, decimals=4)*100)
+	#
+	# 		# Make a list of PC names for future organizational purposes
+	# 		pcNames = ['PC'+str(x) for x in range(1,fcOfInterest.shape[1]+1)]
+	#
+	# 		# Get the PC loadings as a data frame
+	# 		loadingsDF = pd.DataFrame(pcaOutput.components_,columns=[str(x)+'_Loads' for x in bandNames],index=pcNames)
+	#
+	# 		# Get the original data transformed into PC space
+	# 		transformedData = pd.DataFrame(pcaOutput.fit_transform(standardizedData,standardizedData),columns=pcNames)
+	#
+	# 		# Make principal components images, multiplying the standardized image by each of the eigenvectors
+	# 		# Collect each one of the images in a single image collection
+	#
+	# 		# First step: make an image collection wherein each image is a PC loadings image
+	# 		listOfLoadings = ee.List(loadingsDF.values.tolist())
+	# 		eePCNames = ee.List(pcNames)
+	# 		zippedList = eePCNames.zip(listOfLoadings)
+	# 		def makeLoadingsImage(zippedValue):
+	# 			return ee.Image.constant(ee.List(zippedValue).get(1)).rename(bandNames).set('PC',ee.List(zippedValue).get(0))
+	# 		loadingsImageCollection = ee.ImageCollection(zippedList.map(makeLoadingsImage))
+	#
+	# 		# Second step: multiply each of the loadings image by the standardized image and reduce it using a "sum"
+	# 		# to finalize the matrix multiplication
+	# 		def finalizePCImages(loadingsImage):
+	# 			PCName = ee.String(ee.Image(loadingsImage).get('PC'))
+	# 			return ee.Image(loadingsImage).multiply(standardizedImage).reduce('sum').rename([PCName]).set('PC',PCName)
+	# 		principalComponentsImages = loadingsImageCollection.map(finalizePCImages)
+	#
+	# 		# Choose how many principal components are of interest in this analysis based on amount of
+	# 		# variance explained
+	# 		numberOfComponents = sum(i < propOfVariance for i in cumulativeVariance)+1
+	# 		print('Number of Principal Components being used:',numberOfComponents)
+	#
+	# 		# Compute the combinations of the principal components being used to compute the 2-D convex hulls
+	# 		tupleCombinations = list(combinations(list(pcNames[0:numberOfComponents]),2))
+	# 		print('Number of Combinations being used:',len(tupleCombinations))
+	#
+	# 		# Generate convex hulls for an example of the principal components of interest
+	# 		cHullCoordsList = list()
+	# 		for c in tupleCombinations:
+	# 			firstPC = c[0]
+	# 			secondPC = c[1]
+	# 			outputCHull = ConvexHull(transformedData[[firstPC,secondPC]])
+	# 			listOfCoordinates = transformedData.loc[outputCHull.vertices][[firstPC,secondPC]].values.tolist()
+	# 			flattenedList = [val for sublist in listOfCoordinates for val in sublist]
+	# 			cHullCoordsList.append(flattenedList)
+	#
+	# 		# Reformat the image collection to an image with band names that can be selected programmatically
+	# 		pcImage = principalComponentsImages.toBands().rename(pcNames)
+	#
+	# 		# Generate an image collection with each PC selected with it's matching PC
+	# 		listOfPCs = ee.List(tupleCombinations)
+	# 		listOfCHullCoords = ee.List(cHullCoordsList)
+	# 		zippedListPCsAndCHulls = listOfPCs.zip(listOfCHullCoords)
+	#
+	# 		def makeToClassifyImages(zippedListPCsAndCHulls):
+	# 			imageToClassify = pcImage.select(ee.List(zippedListPCsAndCHulls).get(0)).set('CHullCoords',ee.List(zippedListPCsAndCHulls).get(1))
+	# 			classifiedImage = imageToClassify.rename('u','v').classify(ee.Classifier.spectralRegion([imageToClassify.get('CHullCoords')]))
+	# 			return classifiedImage
+	#
+	# 		classifedImages = ee.ImageCollection(zippedListPCsAndCHulls.map(makeToClassifyImages))
+	# 		finalImageToExport = classifedImages.sum().divide(ee.Image.constant(len(tupleCombinations)))
+	#
+	# 		return finalImageToExport
+	#
+	# 	# PCA interpolation-extrapolation image
+	# 	PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
+	# 	return PCA_int_ext
+	#
+	# PCA_int_ext = ee.ImageCollection.fromImages(list(map(PCA_int_extFunc, compositeList))).toBands().rename(['PCA_int_ext_current',
+	# 'PCA_int_ext_rcp26_2050',
+	# 'PCA_int_ext_rcp26_2070',
+	# 'PCA_int_ext_rcp45_2050',
+	# 'PCA_int_ext_rcp45_2070',
+	# 'PCA_int_ext_rcp60_2050',
+	# 'PCA_int_ext_rcp60_2070',
+	# 'PCA_int_ext_rcp85_2050',
+	# 'PCA_int_ext_rcp85_2070'])
+	#
+	# PCA_int_ext_export = ee.batch.Export.image.toAsset(
+	# 	image = PCA_int_ext.toFloat(),
+	# 	description = classProperty+'_PCA_int_ext',
+	# 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_PCA_int_ext',
+	# 	crs = 'EPSG:4326',
+	# 	crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+	# 	region = exportingGeometry,
+	# 	maxPixels = int(1e13),
+	# 	pyramidingPolicy = {".default": pyramidingPolicy}
+	# )
+	# # PCA_int_ext_export.start()
+	#
+	# ##################################################################################################################################################################
+	# # Final image export
+	# ##################################################################################################################################################################
+	#
+	# # Construct final image to export
+	# if log_transform_classProperty == True:
+	# 	finalImageToExport = ee.Image.cat(image_toExport.exp(),
+	# 	meanImage.exp(),
+	# 	upperLowerCIImage.exp(),
+	# 	stdDevImage.exp(),
+	# 	# univariate_int_ext_image,
+	# 	# PCA_int_ext
+	# 	)
+	# else:
+	# 	finalImageToExport = ee.Image.cat(image_toExport,
+	# 	meanImage,
+	# 	upperLowerCIImage,
+	# 	stdDevImage,
+	# 	# univariate_int_ext_image,
+	# 	# PCA_int_ext
+	# 	)
+	#
+	# FinalImageExport = ee.batch.Export.image.toAsset(
+	# 	image = finalImageToExport.toFloat(),
+	# 	description = classProperty+'_Bootstrapped_MultibandImage',
+	# 	# assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wPrimers',
+	# 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wFuturePreds',
+	# 	crs = 'EPSG:4326',
+	# 	crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+	# 	region = exportingGeometry,
+	# 	maxPixels = int(1e13),
+	# 	pyramidingPolicy = {".default": pyramidingPolicy}
+	# )
+	# FinalImageExport.start()
+	#
+	# print('Map exports started! Moving on...')
+	#
+	# ##################################################################################################################################################################
+	# # Spatial Leave-One-Out cross validation
+	# ##################################################################################################################################################################
+	#
+	# # !! NOTE: this is a fairly computatinally intensive excercise, so there are some precautions to take to ensure servers aren't overloaded
+	# # !! This operaion SHOULD NOT be performed on the entire dataset
+	#
+	# # Set number of random points to test
+	# if preppedCollection.shape[0] > 1000:
+	# 	n_points = 1000 # Don't increase this value!
+	# else:
+	# 	n_points = preppedCollection.shape[0]
+	#
+	# # Set number of repetitions
+	# n_reps = 10
+	# nList = list(range(0,n_reps))
+	#
+	# if buffer_size == list():
+	# 	# create list with species + thresholds
+	# 	mapList = []
+	# 	for item in nList:
+	# 		mapList = mapList + (list(zip(buffer_size, repeat(item))))
+	#
+	# 	# Make a feature collection from the buffer sizes list
+	# 	fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
+	#
+	# else:
+	# 	fc_toMap = ee.FeatureCollection(ee.List(nList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',buffer_size).set('rep',n)))
+	#
+	# # Helper function 1: assess whether point is within sampled range
+	# def WithinRange(f):
+	# 	testFeature = f
+	# 	# Training FeatureCollection: all samples not within geometry of test feature
+	# 	trainFC = fcOI.filter(ee.Filter.geometry(f.geometry()).Not())
+	#
+	# 	# Make a FC with the band names
+	# 	fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
+	#
+	# 	# Helper function 1b: assess whether training point is within sampled range; per band
+	# 	def getRange(f):
+	# 		bandBeingComputed = f.get('BandName')
+	# 		minValue = trainFC.aggregate_min(bandBeingComputed)
+	# 		maxValue = trainFC.aggregate_max(bandBeingComputed)
+	# 		testFeatureWithinRange = ee.Number(testFeature.get(bandBeingComputed)).gte(ee.Number(minValue)).bitwiseAnd(ee.Number(testFeature.get(bandBeingComputed)).lte(ee.Number(maxValue)))
+	# 		return f.set('within_range', testFeatureWithinRange)
+	#
+	# 	# Return value of 1 if all bands are within sampled range
+	# 	within_range = fcWithBandNames.map(getRange).aggregate_min('within_range')
+	#
+	# 	return f.set('within_range', within_range)
+	#
+	# # Helper function 2: Spatial Leave One Out cross-validation function:
+	# def BLOOcv(f):
+	# 	# Get iteration ID
+	# 	rep = f.get('rep')
+	#
+	# 	# Test feature
+	# 	testFeature = ee.FeatureCollection(f)
+	#
+	# 	# Training FeatureCollection: all samples not within geometry of test feature
+	# 	trainFC = fcOI.filter(ee.Filter.geometry(testFeature).Not())
+	#
+	# 	if ensemble == False:
+	# 		# Classifier to test: same hyperparameter settings as top model from grid search procedure
+	# 		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+	#
+	# 	if ensemble == True:
+	# 		# Classifiers to test: top 10 models from grid search hyperparameter tuning
+	# 		classifierName = top_10Models.get(rep)
+	# 		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+	#
+	# 	# Train classifier
+	# 	trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
+	#
+	# 	# Apply classifier
+	# 	classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
+	#
+	# 	# Get predicted value
+	# 	predicted = classified.first().get('predicted')
+	#
+	# 	# Set predicted value to feature
+	# 	return f.set('predicted', predicted).copyProperties(f)
+	#
+	# # Helper function 3: R2 calculation function
+	# def calc_R2(f):
+	# 	# Get iteration ID
+	# 	rep = f.get('rep')
+	#
+	# 	# FeatureCollection holding the buffer radius
+	# 	buffer_size = f.get('buffer_size')
+	#
+	# 	# Sample 1000 validation points from the data
+	# 	subsetData = fcOI.randomColumn(seed = rep).sort('random').limit(n_points)
+	#
+	# 	# Add the buffer around the validation data
+	# 	fc_wBuffer = subsetData.map(lambda f: f.buffer(buffer_size))
+	#
+	# 	# Add the iteration ID to the FC
+	# 	fc_toValidate = fc_wBuffer.map(lambda f: f.set('rep', rep))
+	#
+	# 	if loo_cv_wPointRemoval == True:
+	# 		# Remove points not within sampled range
+	# 		fc_withinSampledRange = fc_toValidate.map(WithinRange).filter(ee.Filter.eq('within_range', 1))
+	#
+	# 		# Apply blocked leave one out CV function
+	# 		predicted = fc_withinSampledRange.map(BLOOcv)
+	#
+	# 		# outputName = '_sloo_cv_results_woExtrapolation'
+	#
+	# 	if loo_cv_wPointRemoval == False:
+	# 		# Apply blocked leave one out CV function
+	# 		predicted = fc_toValidate.map(BLOOcv)
+	#
+	# 		# outputName = '_sloo_cv_results_wExtrapolation'
+	#
+	# 	# Calculate R2 value
+	# 	R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
+	#
+	# 	return f.set('R2_val', R2_val)
+	#
+	# # Calculate R2 across range of buffer sizes
+	# sloo_cv = fc_toMap.map(calc_R2)
+	#
+	# # Export FC to assets
+	# bloo_cv_fc_export = ee.batch.Export.table.toAsset(
+	# 	collection = sloo_cv,
+	# 	description = classProperty+'_sloo_cv',
+	# 	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_sloo_cv_results_wExtrapolation'
+	# )
+	# bloo_cv_fc_export.start()
+	#
+	# print('Blocked Leave-One-Out started! Moving on...')
+	#
+	#
+	# print('All tasks started! Output files will apear in this folder: users/'+usernameFolderString+'/'+projectFolder)
 
-	# Run a for loop to create multiple bootstrap iterations and upload them to the Google Cloud Storage Bucket
-	# Create an empty list to store all of the file name strings being uploaded (for later use)
-	fileNameList = []
-	for n in seedsToUseForBootstrapping:
-		# Perform the subsetting
-		stratSample = preppedCollection.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
-
-		# Format the title of the CSV and export it to a holding location
-		titleOfBootstrapCSV = fileNameHeader+str(n).zfill(3)
-		fileNameList.append(titleOfBootstrapCSV)
-
-	# Load the best model from the classifier list
-	classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
-
-	# Create empty list to store all fcs
-	fcList = []
-	# Run a for loop to create multiple bootstrap iterations
-	for n in seedsToUseForBootstrapping:
-
-		# Format the title of the CSV and export it to a holding location
-		titleOfColl = fileNameHeader+str(n).zfill(3)
-		collectionPath = 'users/'+usernameFolderString+'/'+projectFolder+'/'+bootstrapCollFolder+'/'+titleOfColl
-
-		# Load the collection from the path
-		fcToTrain = ee.FeatureCollection(collectionPath)
-
-		# Append fc to list
-		fcList.append(fcToTrain)
-
-	pred_climate_current = staticCompositeImg.addBands(climate_2015).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp26_2050 = staticCompositeImg.addBands(climate_rcp26_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp26_2070 = staticCompositeImg.addBands(climate_rcp26_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp45_2050 = staticCompositeImg.addBands(climate_rcp45_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp45_2070 = staticCompositeImg.addBands(climate_rcp45_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp60_2050 = staticCompositeImg.addBands(climate_rcp60_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp60_2070 = staticCompositeImg.addBands(climate_rcp60_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp85_2050 = staticCompositeImg.addBands(climate_rcp85_2050).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-	pred_futureClimate_rcp85_2070 = staticCompositeImg.addBands(climate_rcp85_2070).addBands(constant_imgs).select(covariateList).reproject(staticCompositeImg.projection())
-
-	compositeList = [pred_climate_current,
-	pred_futureClimate_rcp26_2050,
-	pred_futureClimate_rcp26_2070,
-	pred_futureClimate_rcp45_2050,
-	pred_futureClimate_rcp45_2070,
-	pred_futureClimate_rcp60_2050,
-	pred_futureClimate_rcp60_2070,
-	pred_futureClimate_rcp85_2050,
-	pred_futureClimate_rcp85_2070]
-
-	names = ['climate_current',
-	'futureClimate_rcp26_2050',
-	'futureClimate_rcp26_2070',
-	'futureClimate_rcp45_2050',
-	'futureClimate_rcp45_2070',
-	'futureClimate_rcp60_2050',
-	'futureClimate_rcp60_2070',
-	'futureClimate_rcp85_2050',
-	'futureClimate_rcp85_2070']
-
-	dictToBoostrap = {compositeList[i]: names[i] for i in range(len(names))}
-
-	for key, value in dictToBoostrap.items():
-		composite = key
-
-		# Helper fucntion to train a RF classifier and classify the composite image
-		def bootstrapFunc(fc):
-			# Train the classifier with the collection
-			trainedClassifer = classifierToBootstrap.train(fc,classProperty,covariateList)
-
-			# Classify the image
-			classifiedImage = composite.classify(trainedClassifer,classProperty+'_Predicted')
-
-			return classifiedImage
-
-
-		# Reduce bootstrap images to mean
-		meanImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-			reducer = ee.Reducer.mean()
-		)
-
-		# Reduce bootstrap images to lower and upper CIs
-		upperLowerCIImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-			reducer = ee.Reducer.percentile([2.5,97.5],['lower','upper'])
-		)
-
-		# Reduce bootstrap images to standard deviation
-		stdDevImage = ee.ImageCollection.fromImages(list(map(bootstrapFunc, fcList))).reduce(
-			reducer = ee.Reducer.stdDev()
-		)
-
-		imageToExport = ee.Image.cat(meanImage,
-			upperLowerCIImage,
-			stdDevImage).rename(['bootstrapped_mean_'+value,
-								 'bootstrapped_lower_'+value,
-								 'bootstrapped_upper_'+value,
-								 'bootstrapped_stdDev_'+value])
-
-		boostrapExport = ee.batch.Export.image.toAsset(
-			image = imageToExport.toFloat(),
-			description = classProperty+'_bootstrapped_'+value,
-			assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_bootstrapped_'+value,
-			crs = 'EPSG:4326',
-			crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-			region = exportingGeometry,
-			maxPixels = int(1e13),
-			pyramidingPolicy = {".default": pyramidingPolicy}
-		)
-		boostrapExport.start()
-	'''
-	##################################################################################################################################################################
-	# Univariate int-ext analysis
-	##################################################################################################################################################################
-	# Create a feature collection with only the values from the image bands
-	'''fcForMinMax = fcOI.select(covariateList)
-
-	def univariateIntExt(composite):
-		compositeForIntExt = composite.addBands(constant_imgs).select(covariateList).reproject(composite.projection())
-
-		# Make a FC with the band names
-		fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
-
-		def calcMinMax(f):
-		  bandBeingComputed = f.get('BandName')
-		  maxValueToSet = fcForMinMax.reduceColumns(ee.Reducer.minMax(),[bandBeingComputed])
-		  return f.set('MinValue',maxValueToSet.get('min')).set('MaxValue',maxValueToSet.get('max'))
-
-		# Map function
-		fcWithMinMaxValues = ee.FeatureCollection(fcWithBandNames).map(calcMinMax)
-
-		# Make two images from these values (a min and a max image)
-		maxValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MaxValue'))
-		maxDict = ee.Dictionary.fromLists(covariateList,maxValuesWNulls)
-		minValuesWNulls = fcWithMinMaxValues.toList(1000).map(lambda f: ee.Feature(f).get('MinValue'))
-		minDict = ee.Dictionary.fromLists(covariateList,minValuesWNulls)
-		minImage = minDict.toImage()
-		maxImage = maxDict.toImage()
-
-		totalBandsBinary = compositeForIntExt.gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
-		univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeForIntExt.bandNames().length()).rename('univariate_pct_int_ext')
-
-		return univariate_int_ext_image
-
-	univariate_int_ext_image = ee.ImageCollection.fromImages(list(map(univariateIntExt, compositeList))).toBands().rename(['int_ext_current',
-	'int_ext_rcp26_2050',
-	'int_ext_rcp26_2070',
-	'int_ext_rcp45_2050',
-	'int_ext_rcp45_2070',
-	'int_ext_rcp60_2050',
-	'int_ext_rcp60_2070',
-	'int_ext_rcp85_2050',
-	'int_ext_rcp85_2070'])
-
-	univariate_int_ext_export = ee.batch.Export.image.toAsset(
-		image = univariate_int_ext_image.toFloat(),
-		description = classProperty+'_univariate_int_ext',
-		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_univariate_int_ext',
-		crs = 'EPSG:4326',
-		crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-		region = exportingGeometry,
-		maxPixels = int(1e13),
-		pyramidingPolicy = {".default": pyramidingPolicy}
-	)
-	# univariate_int_ext_export.start()
-
-
-	##################################################################################################################################################################
-	# Multivariate (PCA) int-ext analysis
-	##################################################################################################################################################################
-
-	# Input the proportion of variance that you would like to cover
-	propOfVariance = 90
-
-	def PCA_int_extFunc(compositeForIntExt):
-
-		# PCA interpolation/extrapolation helper function
-		def assessExtrapolation(fcOfInterest, propOfVariance):
-			# Compute the mean and standard deviation of each band, then standardize the point data
-			meanVector = fcOfInterest.mean()
-			stdVector = fcOfInterest.std()
-			standardizedData = (fcOfInterest-meanVector)/stdVector
-
-			# Then standardize the composite from which the points were sampled
-			meanList = meanVector.tolist()
-			stdList = stdVector.tolist()
-			bandNames = list(meanVector.index)
-			meanImage = ee.Image(meanList).rename(bandNames)
-			stdImage = ee.Image(stdList).rename(bandNames)
-			standardizedImage = compositeForIntExt.subtract(meanImage).divide(stdImage)
-
-			# Run a PCA on the point samples
-			pcaOutput = PCA()
-			pcaOutput.fit(standardizedData)
-
-			# Save the cumulative variance represented by each PC
-			cumulativeVariance = np.cumsum(np.round(pcaOutput.explained_variance_ratio_, decimals=4)*100)
-
-			# Make a list of PC names for future organizational purposes
-			pcNames = ['PC'+str(x) for x in range(1,fcOfInterest.shape[1]+1)]
-
-			# Get the PC loadings as a data frame
-			loadingsDF = pd.DataFrame(pcaOutput.components_,columns=[str(x)+'_Loads' for x in bandNames],index=pcNames)
-
-			# Get the original data transformed into PC space
-			transformedData = pd.DataFrame(pcaOutput.fit_transform(standardizedData,standardizedData),columns=pcNames)
-
-			# Make principal components images, multiplying the standardized image by each of the eigenvectors
-			# Collect each one of the images in a single image collection
-
-			# First step: make an image collection wherein each image is a PC loadings image
-			listOfLoadings = ee.List(loadingsDF.values.tolist())
-			eePCNames = ee.List(pcNames)
-			zippedList = eePCNames.zip(listOfLoadings)
-			def makeLoadingsImage(zippedValue):
-				return ee.Image.constant(ee.List(zippedValue).get(1)).rename(bandNames).set('PC',ee.List(zippedValue).get(0))
-			loadingsImageCollection = ee.ImageCollection(zippedList.map(makeLoadingsImage))
-
-			# Second step: multiply each of the loadings image by the standardized image and reduce it using a "sum"
-			# to finalize the matrix multiplication
-			def finalizePCImages(loadingsImage):
-				PCName = ee.String(ee.Image(loadingsImage).get('PC'))
-				return ee.Image(loadingsImage).multiply(standardizedImage).reduce('sum').rename([PCName]).set('PC',PCName)
-			principalComponentsImages = loadingsImageCollection.map(finalizePCImages)
-
-			# Choose how many principal components are of interest in this analysis based on amount of
-			# variance explained
-			numberOfComponents = sum(i < propOfVariance for i in cumulativeVariance)+1
-			print('Number of Principal Components being used:',numberOfComponents)
-
-			# Compute the combinations of the principal components being used to compute the 2-D convex hulls
-			tupleCombinations = list(combinations(list(pcNames[0:numberOfComponents]),2))
-			print('Number of Combinations being used:',len(tupleCombinations))
-
-			# Generate convex hulls for an example of the principal components of interest
-			cHullCoordsList = list()
-			for c in tupleCombinations:
-				firstPC = c[0]
-				secondPC = c[1]
-				outputCHull = ConvexHull(transformedData[[firstPC,secondPC]])
-				listOfCoordinates = transformedData.loc[outputCHull.vertices][[firstPC,secondPC]].values.tolist()
-				flattenedList = [val for sublist in listOfCoordinates for val in sublist]
-				cHullCoordsList.append(flattenedList)
-
-			# Reformat the image collection to an image with band names that can be selected programmatically
-			pcImage = principalComponentsImages.toBands().rename(pcNames)
-
-			# Generate an image collection with each PC selected with it's matching PC
-			listOfPCs = ee.List(tupleCombinations)
-			listOfCHullCoords = ee.List(cHullCoordsList)
-			zippedListPCsAndCHulls = listOfPCs.zip(listOfCHullCoords)
-
-			def makeToClassifyImages(zippedListPCsAndCHulls):
-				imageToClassify = pcImage.select(ee.List(zippedListPCsAndCHulls).get(0)).set('CHullCoords',ee.List(zippedListPCsAndCHulls).get(1))
-				classifiedImage = imageToClassify.rename('u','v').classify(ee.Classifier.spectralRegion([imageToClassify.get('CHullCoords')]))
-				return classifiedImage
-
-			classifedImages = ee.ImageCollection(zippedListPCsAndCHulls.map(makeToClassifyImages))
-			finalImageToExport = classifedImages.sum().divide(ee.Image.constant(len(tupleCombinations)))
-
-			return finalImageToExport
-
-		# PCA interpolation-extrapolation image
-		PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
-		return PCA_int_ext
-
-	PCA_int_ext = ee.ImageCollection.fromImages(list(map(PCA_int_extFunc, compositeList))).toBands().rename(['PCA_int_ext_current',
-	'PCA_int_ext_rcp26_2050',
-	'PCA_int_ext_rcp26_2070',
-	'PCA_int_ext_rcp45_2050',
-	'PCA_int_ext_rcp45_2070',
-	'PCA_int_ext_rcp60_2050',
-	'PCA_int_ext_rcp60_2070',
-	'PCA_int_ext_rcp85_2050',
-	'PCA_int_ext_rcp85_2070'])
-
-	PCA_int_ext_export = ee.batch.Export.image.toAsset(
-		image = PCA_int_ext.toFloat(),
-		description = classProperty+'_PCA_int_ext',
-		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_PCA_int_ext',
-		crs = 'EPSG:4326',
-		crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-		region = exportingGeometry,
-		maxPixels = int(1e13),
-		pyramidingPolicy = {".default": pyramidingPolicy}
-	)'''
-	# PCA_int_ext_export.start()
-
-	##################################################################################################################################################################
-	# Final image export
-	##################################################################################################################################################################
-
-	'''# Construct final image to export
-	if log_transform_classProperty == True:
-		finalImageToExport = ee.Image.cat(image_toExport.exp(),
-		meanImage.exp(),
-		upperLowerCIImage.exp(),
-		stdDevImage.exp(),
-		# univariate_int_ext_image,
-		# PCA_int_ext
-		)
-	else:
-		finalImageToExport = ee.Image.cat(image_toExport,
-		meanImage,
-		upperLowerCIImage,
-		stdDevImage,
-		# univariate_int_ext_image,
-		# PCA_int_ext
-		)
-
-	FinalImageExport = ee.batch.Export.image.toAsset(
-		image = finalImageToExport.toFloat(),
-		description = classProperty+'_Bootstrapped_MultibandImage',
-		# assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wPrimers',
-		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classified_MultibandImage_wFuturePreds',
-		crs = 'EPSG:4326',
-		crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-		region = exportingGeometry,
-		maxPixels = int(1e13),
-		pyramidingPolicy = {".default": pyramidingPolicy}
-	)
-	FinalImageExport.start()
-
-	print('Map exports started! Moving on...')'''
-
-	##################################################################################################################################################################
-	# Spatial Leave-One-Out cross validation
-	##################################################################################################################################################################
-
-	# !! NOTE: this is a fairly computatinally intensive excercise, so there are some precautions to take to ensure servers aren't overloaded
-	# !! This operaion SHOULD NOT be performed on the entire dataset
-	'''
-	# Set number of random points to test
-	if preppedCollection.shape[0] > 1000:
-		n_points = 1000 # Don't increase this value!
-	else:
-		n_points = preppedCollection.shape[0]
-
-	# Set number of repetitions
-	n_reps = 10
-	nList = list(range(0,n_reps))
-
-	if buffer_size == list():
-		# create list with species + thresholds
-		mapList = []
-		for item in nList:
-			mapList = mapList + (list(zip(buffer_size, repeat(item))))
-
-		# Make a feature collection from the buffer sizes list
-		fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
-
-	else:
-		fc_toMap = ee.FeatureCollection(ee.List(nList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',buffer_size).set('rep',n)))
-
-	# Helper function 1: assess whether point is within sampled range
-	def WithinRange(f):
-		testFeature = f
-		# Training FeatureCollection: all samples not within geometry of test feature
-		trainFC = fcOI.filter(ee.Filter.geometry(f.geometry()).Not())
-
-		# Make a FC with the band names
-		fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
-
-		# Helper function 1b: assess whether training point is within sampled range; per band
-		def getRange(f):
-			bandBeingComputed = f.get('BandName')
-			minValue = trainFC.aggregate_min(bandBeingComputed)
-			maxValue = trainFC.aggregate_max(bandBeingComputed)
-			testFeatureWithinRange = ee.Number(testFeature.get(bandBeingComputed)).gte(ee.Number(minValue)).bitwiseAnd(ee.Number(testFeature.get(bandBeingComputed)).lte(ee.Number(maxValue)))
-			return f.set('within_range', testFeatureWithinRange)
-
-		# Return value of 1 if all bands are within sampled range
-		within_range = fcWithBandNames.map(getRange).aggregate_min('within_range')
-
-		return f.set('within_range', within_range)
-
-	# Helper function 2: Spatial Leave One Out cross-validation function:
-	def BLOOcv(f):
-		# Get iteration ID
-		rep = f.get('rep')
-
-		# Test feature
-		testFeature = ee.FeatureCollection(f)
-
-		# Training FeatureCollection: all samples not within geometry of test feature
-		trainFC = fcOI.filter(ee.Filter.geometry(testFeature).Not())
-
-		if ensemble == False:
-			# Classifier to test: same hyperparameter settings as top model from grid search procedure
-			classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
-
-		if ensemble == True:
-			# Classifiers to test: top 10 models from grid search hyperparameter tuning
-			classifierName = top_10Models.get(rep)
-			classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
-
-		# Train classifier
-		trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
-
-		# Apply classifier
-		classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
-
-		# Get predicted value
-		predicted = classified.first().get('predicted')
-
-		# Set predicted value to feature
-		return f.set('predicted', predicted).copyProperties(f)
-
-	# Helper function 3: R2 calculation function
-	def calc_R2(f):
-		# Get iteration ID
-		rep = f.get('rep')
-
-		# FeatureCollection holding the buffer radius
-		buffer_size = f.get('buffer_size')
-
-		# Sample 1000 validation points from the data
-		subsetData = fcOI.randomColumn(seed = rep).sort('random').limit(n_points)
-
-		# Add the buffer around the validation data
-		fc_wBuffer = subsetData.map(lambda f: f.buffer(buffer_size))
-
-		# Add the iteration ID to the FC
-		fc_toValidate = fc_wBuffer.map(lambda f: f.set('rep', rep))
-
-		if loo_cv_wPointRemoval == True:
-			# Remove points not within sampled range
-			fc_withinSampledRange = fc_toValidate.map(WithinRange).filter(ee.Filter.eq('within_range', 1))
-
-			# Apply blocked leave one out CV function
-			predicted = fc_withinSampledRange.map(BLOOcv)
-
-			# outputName = '_sloo_cv_results_woExtrapolation'
-
-		if loo_cv_wPointRemoval == False:
-			# Apply blocked leave one out CV function
-			predicted = fc_toValidate.map(BLOOcv)
-
-			# outputName = '_sloo_cv_results_wExtrapolation'
-
-		# Calculate R2 value
-		R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
-
-		return f.set('R2_val', R2_val)
-
-	# Calculate R2 across range of buffer sizes
-	sloo_cv = fc_toMap.map(calc_R2)
-
-	# Export FC to assets
-	bloo_cv_fc_export = ee.batch.Export.table.toAsset(
-		collection = sloo_cv,
-		description = classProperty+'_sloo_cv',
-		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_sloo_cv_results_wExtrapolation'
-	)
-	bloo_cv_fc_export.start()
-
-	print('Blocked Leave-One-Out started! Moving on...')
-
-
-	print('All tasks started! Output files will apear in this folder: users/'+usernameFolderString+'/'+projectFolder)
-	'''
 number_of_processes = 6
 
 @contextmanager
