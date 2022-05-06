@@ -43,7 +43,7 @@ def pipeline(setup):
 
 	# Input the name of the project folder inside which all of the assets will be stored
 	# This folder will be generated automatically below, if it isn't yet present
-	projectFolder = '000_SPUN_temp_log'
+	projectFolder = '000_SPUN_temp'
 
 	# Input the normal wait time (in seconds) for "wait and break" cells
 	normalWaitTime = 5
@@ -56,7 +56,7 @@ def pipeline(setup):
 	longString = 'Pixel_Long'
 
 	# Log transform classProperty? Boolean, either True or False
-	log_transform_classProperty = True
+	log_transform_classProperty = False
 
 	# Ensemble of top 10 models?
 	ensemble = True
@@ -420,7 +420,7 @@ def pipeline(setup):
 
 	# Remove duplicates or pixel aggregate
 	if pixel_agg == True:
-		preppedCollection = pd.DataFrame(fcToAggregate.groupby(['Pixel_Lat', 'Pixel_Long']).mean().to_records())[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
+		preppedCollection = pd.DataFrame(fcToAggregate.groupby(['Pixel_Lat', 'Pixel_Long']).mean().to_records())[covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
 
 	if distinctObs == True:
 		preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = False)[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
@@ -769,14 +769,21 @@ def pipeline(setup):
 	predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
 	# back-log transform predicted and observed values
-	predObs_df[classProperty+'_Predicted'] = np.exp(predObs_df[classProperty+'_Predicted']) - 1
-	predObs_df[classProperty] = np.exp(predObs_df[classProperty]) - 1
-	predObs_df['AbsResidual'] = np.exp(predObs_df['AbsResidual'])
+	if log_transform_classProperty == True:
+		predObs_df[classProperty+'_Predicted'] = np.exp(predObs_df[classProperty+'_Predicted']) - 1
+		predObs_df[classProperty] = np.exp(predObs_df[classProperty]) - 1
+		predObs_df['AbsResidual'] = np.exp(predObs_df['AbsResidual'])
 
 	# Group by sample ID to return mean across ensemble prediction
-	predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+	if pixel_agg == False:
+		predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 	# Write to file
-	predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_'+setup+'_logTransformed.csv')
+
+	if log_transform_classProperty == True:
+		predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_'+setup+'_logTransformed.csv')
+
+	if log_transform_classProperty == False:
+		predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_'+setup+'_wo_logTransformed.csv')
 
 	# ##################################################################################################################################################################
 	# # Variable importance metrics

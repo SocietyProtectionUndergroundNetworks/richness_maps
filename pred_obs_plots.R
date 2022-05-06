@@ -116,30 +116,123 @@ df %>%
 
 
 
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220425_ECM_diversity_pred_obs_distictObs_wProjectVars_logTransformed.csv') %>% 
-  mutate(setup = 'distictObs_wProjectVars') 
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_distictObs_woProjectVars_logTransformed.csv') %>% 
+  mutate(setup = 'distictObs_woProjectVars') %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_distictObs_wProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'distictObs_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wopixelAgg_woProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_woProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wopixelAgg_wProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wpixelAgg_woProjectVars_logTransformed.csv') %>%
+          mutate(setup = 'wpixelAgg_woProjectVars'), fill = T) %>%
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wpixelAgg_wProjectVars_logTransformed.csv') %>%
+          mutate(setup = 'wpixelAgg_wProjectVars'), fill = T)
 
 df %>% 
-  # group_by(Pixel_Lat, Pixel_Long, setup) %>%
-  # summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  mutate(ECM_diversity = ECM_diversity + 0.01) %>% 
   ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
   # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
   geom_point(aes(color = setup)) +
   scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
-  xlim(c(0,40000)) + ylim(c(0,40000)) +
+  # xlim(c(0,30000)) + ylim(c(0,30000)) +
   geom_abline() +
   geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
-  # facet_wrap(vars(setup)) +
+  facet_wrap(vars(setup)) +
   theme_minimal() +
   scale_x_log10() + scale_y_log10() +
   theme(legend.position = "none") +
   labs(
-    title = "Mean per pixel",
-    # subtitle = "Summary statistics for NDVI, Npp and PET",
+    title = "log(x+1) transformed",
+    subtitle = "Mean per pixel",
     y = "Predicted EMF Richness", x = "Observed EMF Richness")
 
 
-hist(log(df$ECM_diversity + 1, base = 10))
+
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_distictObs_woProjectVars_wo_logTransformed.csv') %>% 
+  mutate(setup = 'distictObs_woProjectVars') %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_distictObs_wProjectVars_wo_logTransformed.csv') %>% 
+          mutate(setup = 'distictObs_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wopixelAgg_woProjectVars_wo_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_woProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wopixelAgg_wProjectVars_wo_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wpixelAgg_woProjectVars_wo_logTransformed.csv') %>%
+          mutate(setup = 'wpixelAgg_woProjectVars'), fill = T) %>%
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_wpixelAgg_wProjectVars_wo_logTransformed.csv') %>%
+          mutate(setup = 'wpixelAgg_wProjectVars'), fill = T)
+
+df %>% 
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  mutate(ECM_diversity = ECM_diversity + 0.01) %>% 
+  ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  geom_point(aes(color = setup)) +
+  scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
+  # xlim(c(0,30000)) + ylim(c(0,30000)) +
+  geom_abline() +
+  geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
+  facet_wrap(vars(setup)) +
+  theme_minimal() +
+  scale_x_log10() + scale_y_log10() +
+  theme(legend.position = "none") +
+  labs(
+    title = "no log transformation",
+    subtitle = "Mean per pixel",
+    y = "Predicted EMF Richness", x = "Observed EMF Richness")
+
+
+
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_distictObs_woProjectVars_logTransformed.csv') %>% 
+  mutate(setup = 'distictObs_woProjectVars') %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_distictObs_wProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'distictObs_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_wopixelAgg_woProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_woProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_wopixelAgg_wProjectVars_logTransformed.csv') %>% 
+          mutate(setup = 'wopixelAgg_wProjectVars'), fill = T)
+
+
+
+
+df %>% 
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  mutate(ECM_diversity = ECM_diversity + 0.01) %>% 
+  ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  geom_point(aes(color = setup)) +
+  scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
+  # xlim(c(0,30000)) + ylim(c(0,30000)) +
+  geom_abline() +
+  geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
+  facet_wrap(vars(setup)) +
+  theme_minimal() +
+  scale_x_log10() + scale_y_log10() +
+  theme(legend.position = "none") +
+  labs(
+    title = "no log transformation",
+    subtitle = "Mean per pixel",
+    y = "Predicted EMF Richness", x = "Observed EMF Richness")
+
+
+
+######
+
+xxx
+  
+
+
+
+
 
 # Source of "stat_smooth_func" and "StatSmoothFunc": https://gist.github.com/kdauria/524eade46135f6348140
 # Slightly modified 

@@ -702,7 +702,7 @@ def pipeline(setup):
         	classifiedImageRegression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Predicted')
         	classifiedImageProbability = compositeImg.classify(trainedClassiferProbability,classProperty+'_Predicted')
 
-            classifiedImage =
+            # classifiedImage =
 
         if ensemble == True:
         	def classifyImage(classifierName):
