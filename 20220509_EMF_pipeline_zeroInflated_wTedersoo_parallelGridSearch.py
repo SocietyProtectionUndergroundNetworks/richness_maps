@@ -330,7 +330,7 @@ def MAE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
 	return MAE
 
 # Function to take a feature with a classifier of interest
-def computeCVAccuracyAndRMSE(featureWithClassifier):
+def computeCVAccuracyAndRMSE(featureWithClassifier, fcOI):
 	# Pull the classifier from the feature
 	cOI = ee.Classifier(featureWithClassifier.get('c'))
 
@@ -708,20 +708,38 @@ except Exception as e:
 	classDfClassification = pd.DataFrame(columns = ['Mean_overallAccuracy', 'StDev_overallAccuracy', 'cName'])
 
 	def gridSearch(rf):
+		cOI = ee.Classifier(rf.get('c'))
 
-		print('Testing model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression))
-		print(rf.get('cName').getInfo())
-		# train classifier only on data not equalling zero
-		# train classifier only on GlobalFungi data
-		fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
-				.filter(ee.Filter.neq(classProperty, 0))\
-				.filter(ee.Filter.eq('source', 'GlobalFungi'))
-		accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
+		# Get the model type
+		modelType = cOI.mode().getInfo()
 
-		classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
-		return classDfRegression
+		if modelType == 'REGRESSION':
+			# train classifier only on data not equalling zero
+			# train classifier only on GlobalFungi data
+			fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
+					.filter(ee.Filter.neq(classProperty, 0))\
+					.filter(ee.Filter.eq('source', 'GlobalFungi')).limit(10)
+			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf, fcOI))
 
-	number_of_processes = 6
+			classDfRegression = pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0])
+			print(classDfRegression)
+			return classDfRegression
+
+		if modelType == 'CLASSIFICATION':
+			# train classifier only on data not equalling zero
+			# train classifier only on GlobalFungi data
+			fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
+						.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).divide(f.get(classProperty)))).limit(10)
+			# categoricalLevels = fcOI.aggregate_array(classProperty).distinct().getInfo()
+			categoricalLevels = [1, 0]
+
+			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf, fcOI))
+
+			classDfClassification = pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0])
+			print(classDfClassification)
+			return classDfClassification
+
+	number_of_processes = 12
 
 	@contextmanager
 	def poolcontext(*args, **kwargs):
@@ -729,19 +747,37 @@ except Exception as e:
 		pool = multiprocessing.Pool(*args, **kwargs)
 		yield pool
 		pool.terminate()
+		pool.join()
 
 	if __name__ == '__main__':
 
 		with poolcontext(number_of_processes) as pool:
+			results = pool.map(gridSearch, classifierListRegression+classifierListClassification)
 
-			results = pool.map(gridSearch, classifierListRegression)
-			results = pd.concat(results)
-			with open('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', 'a') as f:
-				results.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'], index=False, mode='a', header=f.tell()==0)
-			print('done')
+		df = pd.concat(results)
+		print(df)
 
+
+	#
+	#
+	# @contextmanager
+	# def poolcontext(*args, **kwargs):
+	# 	"""This just makes the multiprocessing easier with a generator."""
+	# 	pool = multiprocessing.Pool(*args, **kwargs)
+	# 	yield pool
+	# 	pool.terminate()
+	#
+	# if __name__ == '__main__':
+	#
+	# 	with poolcontext(number_of_processes) as pool:
+	#
+	# 		results = pool.map(gridSearch, classifierListRegression)
+	# 		results = pd.concat(results)
+	# 		with open('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', 'a') as f:
+	# 			results.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'], index=False, mode='a', header=f.tell()==0)
+
+'''
 	for rf in classifierListClassification:
-		print('class')
 		print('Testing model', classifierListClassification.index(rf), 'out of total of', len(classifierListClassification))
 
 		fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -1049,7 +1085,7 @@ if log_transform_classProperty == False:
 	predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_zeroInflated_'+setup+'_wo_logTransformed'+'_wTedersoo'+'.csv')
 
 print('done')
-
+'''
 # ##################################################################################################################################################################
 # # Variable importance metrics
 # ##################################################################################################################################################################

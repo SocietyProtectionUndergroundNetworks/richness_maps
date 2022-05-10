@@ -200,7 +200,7 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
 	return featureToReturn
 
 
-fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_temp_log_zeroInflated_wTedersoo/ECM_diversitydistictObs_wProjectVars_wCV_folds_data')
+fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_temp_log_zeroInflated_wTedersoo/ECM_diversitydistictObs_wProjectVars_wCV_folds_data').limit(100)
 
 # Define hyperparameters for grid search
 varsPerSplit_list = list(range(2,5))
@@ -214,7 +214,7 @@ for vps in varsPerSplit_list:
 		model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + '_REGRESSION'
 
 		rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
-		numberOfTrees = 5,
+		numberOfTrees = 500,
 		variablesPerSplit = vps,
 		minLeafPopulation = lp,
 		bagFraction = 0.632,
@@ -239,51 +239,25 @@ def gridSearch(rf):
 	accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 
 	classDfRegression = pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0])
-	classDfRegression.to_csv(rf.get('cName').getInfo()+'.csv')
-	# return classDfRegression
+	# with open('tmp.csv', 'a') as f:
+	# 	classDfRegression.to_csv('tmp.csv', columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'], index=False, mode='a', header=f.tell()==0)
 
-number_of_processes = 3
+	return classDfRegression
 
-# @contextmanager
-# def poolcontext(*args, **kwargs):
-# 	"""This just makes the multiprocessing easier with a generator."""
-# 	pool = multiprocessing.Pool(*args, **kwargs)
-# 	yield pool
-# 	pool.terminate()
-# 	pool.join()
-#
-# if __name__ == '__main__':
-#
-# 	with poolcontext(number_of_processes) as pool:
-#
-# 		results = pool.map(gridSearch, classifierListRegression)
-#
-# 		df = pd.concat(results)
+number_of_processes = 12
+
 @contextmanager
 def poolcontext(*args, **kwargs):
 	"""This just makes the multiprocessing easier with a generator."""
 	pool = multiprocessing.Pool(*args, **kwargs)
 	yield pool
-	# pool.terminate()
-	pool.join()
+	pool.terminate()
 
 if __name__ == '__main__':
 
-	with poolcontext(3) as pool:
+	with poolcontext(number_of_processes) as pool:
 
 		results = pool.map(gridSearch, classifierListRegression)
 
-		df = pd.concat(results)
-
-#
-# print(df)
-#
-if __name__ == '__main__':
-
-	with multiprocessing.Pool(3) as pool:
-
-		results = pool.map(gridSearch, classifierListRegression)
-
-		df = pd.concat(results)
-
-print(df)
+	df = pd.concat(results)
+	print(df)
