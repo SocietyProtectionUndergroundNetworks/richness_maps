@@ -100,7 +100,7 @@ compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_
 # compositeToUse = ee.Image.cat(currentClimate, compositeImg, landUse2015, urban_2015)
 
 # FeatureCollection to sample
-points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN/tedersoo/all_taxa_tedersoo_EricoidMycorrhizal")
+points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN/tedersoo/all_taxa_tedersoo_Ectomycorrhizal")
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']

@@ -216,13 +216,51 @@ df %>%
   geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
   facet_wrap(vars(setup)) +
   theme_minimal() +
-  scale_x_log10() + scale_y_log10() +
+  # scale_x_log10() + scale_y_log10() +
+  scale_y_continuous(trans = "log10", expand = c(0,0.5)) + scale_x_continuous(trans = "log10", expand = c(0.1,0))
   theme(legend.position = "none") +
   labs(
     title = "no log transformation",
     subtitle = "Mean per pixel",
     y = "Predicted EMF Richness", x = "Observed EMF Richness")
 
+
+  
+  
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_distictObs_woProjectVars_logTransformed_wTedersoo.csv') %>% 
+  mutate(setup = 'distictObs_woProjectVars') %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_distictObs_wProjectVars_logTransformed_wTedersoo.csv') %>% 
+          mutate(setup = 'distictObs_wProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_wopixelAgg_woProjectVars_logTransformed_wTedersoo.csv') %>% 
+          mutate(setup = 'wopixelAgg_woProjectVars'), fill = T) %>% 
+  rbind(fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/20220504_ECM_diversity_pred_obs_zeroInflated_wopixelAgg_wProjectVars_logTransformed_wTedersoo.csv') %>% 
+          mutate(setup = 'wopixelAgg_wProjectVars'), fill = T)
+
+
+
+
+df %>% 
+  group_by(Pixel_Lat, Pixel_Long, setup) %>%
+  summarise(ECM_diversity = mean(ECM_diversity), ECM_diversity_Predicted = mean(ECM_diversity_Predicted)) %>%
+  mutate(ECM_diversity = ECM_diversity + 0.01) %>% 
+  ggplot(aes(x = ECM_diversity, y = ECM_diversity_Predicted)) +
+  # stat_smooth_func(geom = "text", method = "lm", hjust = 0, parse = TRUE) +
+  geom_point(aes(color = setup)) +
+  scale_color_manual(values = rev(brewer.pal(6, "Paired"))) +
+  # xlim(c(0,30000)) + ylim(c(0,30000)) +
+  geom_abline() +
+  geom_smooth(method = 'lm', formula = 'y ~ x', color = 'black', lwd = 0.5) +
+  facet_wrap(vars(setup)) +
+  theme_minimal() +
+  # scale_x_log10() + scale_y_log10() +
+  scale_y_continuous(trans = "log10", expand = c(0,0.5)) + scale_x_continuous(trans = "log10", expand = c(0.1,0)) +
+theme(legend.position = "none") +
+  labs(
+    title = "no log transformation",
+    subtitle = "Mean per pixel",
+    y = "Predicted EMF Richness", x = "Observed EMF Richness")
 
 
 ######

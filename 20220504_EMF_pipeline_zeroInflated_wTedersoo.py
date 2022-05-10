@@ -158,7 +158,7 @@ def pipeline(setup):
 	kList = list(range(1,k+1))
 
 	# Set number of trees in RF models
-	nTrees = 100
+	nTrees = 250
 
 	# Input the name of the property that holds the CV fold assignment
 	cvFoldString = 'CV_Fold'
@@ -367,7 +367,6 @@ def pipeline(setup):
 		accuracyFC = kFoldAssignmentFC.map(computeAccuracyForFold)
 
 		if modelType == 'REGRESSION':
-			fcOI = fcOI_forRegression
 			meanAccuracy = accuracyFC.aggregate_mean('R2')
 			tsdAccuracy = accuracyFC.aggregate_total_sd('R2')
 
@@ -389,11 +388,9 @@ def pipeline(setup):
 			featureToReturn = featureWithClassifier.select(['cName']).set('Mean_R2',meanAccuracy,'StDev_R2',tsdAccuracy, 'Mean_RMSE',meanRMSE,'StDev_RMSE',sdRMSE, 'Mean_MAE',meanMAE,'StDev_MAE',tsdMAE)
 
 		if modelType == 'CLASSIFICATION':
-			fcOI = fcOI_forClassification
-			categoricalLevels = [int(n) for n in list(ee.Dictionary(fcOI.aggregate_histogram(classProperty)).keys().getInfo())]
 			accuracyFC = kFoldAssignmentFC.map(computeAccuracyForFold)
-			meanAccuracy = accuracyFC.aggregate_mean(accuracyMetricString)
-			tsdAccuracy = accuracyFC.aggregate_total_sd(accuracyMetricString)
+			meanAccuracy = accuracyFC.aggregate_mean('overallAccuracy')
+			tsdAccuracy = accuracyFC.aggregate_total_sd('overallAccuracy')
 
 			# Compute the feature to return
 			featureToReturn = featureWithClassifier.select(['cName']).set('Mean_overallAccuracy',meanAccuracy,'StDev_overallAccuracy',tsdAccuracy)
@@ -435,7 +432,7 @@ def pipeline(setup):
 		# Import the raw CSV
 		GF_data = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip')
 		GF_data['source'] = 'GlobalFungi'
-		tedersoo_data = pd.read_csv('data/20211130_tedersoo_dataset.csv', float_precision='round_trip')
+		tedersoo_data = pd.read_csv('data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv', float_precision='round_trip')
 		tedersoo_data['source'] = 'Tedersoo'
 
 		rawPointCollection = pd.concat([GF_data, tedersoo_data])
@@ -652,7 +649,7 @@ def pipeline(setup):
 
 	# Define hyperparameters for grid search
 	varsPerSplit_list = list(range(2,8))
-	leafPop_list = list(range(2,3))
+	leafPop_list = list(range(4,8))
 
 	classifierListRegression = []
 	# Create list of classifiers
@@ -708,12 +705,16 @@ def pipeline(setup):
 		kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
 
 		classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
-		classDfClassification = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
+		classDfClassification = pd.DataFrame(columns = ['Mean_overallAccuracy', 'StDev_overallAccuracy', 'cName'])
 
 		for rf in classifierListRegression:
 			print('Testing model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression))
 
-			fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0)) #  train classifier only on data not equalling zero
+			#  train classifier only on data not equalling zero
+			# train classifier only on GlobalFungi data
+			fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
+					.filter(ee.Filter.neq(classProperty, 0))\
+					.filter(ee.Filter.eq('source', 'GlobalFungi'))
 			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 
 			classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
@@ -721,14 +722,16 @@ def pipeline(setup):
 		for rf in classifierListClassification:
 			print('Testing model', classifierListClassification.index(rf), 'out of total of', len(classifierListClassification))
 
-			fcOI_forClassification = fcOI.map(lambda f: f.set('ECM_diversity', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+			fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+			fcOI = fcOI.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+			categoricalLevels = fcOI.aggregate_array(classProperty).distinct().getInfo()
 
 			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 
 			classDfClassification = classDfClassification.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
 
 		classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
-		classDfSortedClassification = classDfClassification.sort_values([sort_acc_prop], ascending = False) #Sorting Classification model by R2 doens't make sense - test accuracy instead
+		classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy'], ascending = False) #Sorting Classification model by R2 doens't make sense - test accuracy instead
 
 		# Write model results to csv
 		classDfSortedRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', index=False)
@@ -786,11 +789,11 @@ def pipeline(setup):
 
 		# Get top model name
 		bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
-		bestModelNameClassification = grid_search_resultsClassification.limit(1, 'Mean_R2', False).first().get('cName')
+		bestModelNameClassification = grid_search_resultsClassification.limit(1, 'Mean_overallAccuracy', False).first().get('cName')
 
 		# Get top 10 models
 		top_10ModelsRegression = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
-		top_10ModelsClassification = grid_search_resultsClassification.limit(10, 'Mean_R2', False).aggregate_array('cName')
+		top_10ModelsClassification = grid_search_resultsClassification.limit(10, 'Mean_overallAccuracy', False).aggregate_array('cName')
 
 		print('Moving on...')
 
@@ -889,6 +892,7 @@ def pipeline(setup):
 	##################################################################################################################################################################
 	# Predicted - Observed
 	##################################################################################################################################################################
+	fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
 	# TEMP - first we actually only really care about predicted-observed
 	try:
