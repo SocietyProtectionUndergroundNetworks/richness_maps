@@ -158,7 +158,7 @@ k = 10
 kList = list(range(1,k+1))
 
 # Set number of trees in RF models
-nTrees = 250
+nTrees = 500
 
 # Input the name of the property that holds the CV fold assignment
 cvFoldString = 'CV_Fold'
@@ -436,6 +436,7 @@ except Exception as e:
 	# tedersoo_data['source'] = 'Tedersoo'
 	#
 	# rawPointCollection = pd.concat([GF_data, tedersoo_data])
+	rawPointCollection = GF_data
 
 	# Rename columnto be mapped
 	rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
@@ -523,7 +524,7 @@ fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+
 
 # Define hyperparameters for grid search
 varsPerSplit_list = list(range(2,8))
-leafPop_list = list(range(4,8))
+leafPop_list = list(range(2,8))
 
 classifierListRegression = []
 # Create list of classifiers
@@ -675,95 +676,6 @@ except Exception as e:
 # GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv('output/'+classProperty+'_grid_search_results.csv')
 
 ##################################################################################################################################################################
-# Classify image
-##################################################################################################################################################################
-# Reference covariate levels for mapping:
-# top: 0
-# bot: 10
-# core.length: 10
-# Sample.type: soil
-# target_marker: Illumina
-# target_marker: ITS2
-# Primers: ITS3/ITS4
-
-# Sample FMS17564v2 has the reference levels:
-# rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']
-
-# Project-specific variables
-# top = ee.Image.constant(0)
-# bot = ee.Image.constant(10)
-# corelength = ee.Image.constant(10)
-# target_marker = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['target_marker']))
-# sequencing_platform = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sequencing_platform']))
-# sample_type = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sample_type']))
-# primers = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['primers']))
-#
-# constant_imgs = ee.ImageCollection.fromImages([target_marker, sequencing_platform, sample_type, primers]).toBands().rename(['target_marker', 'sequencing_platform', 'sample_type', 'primers'])
-#
-# def finalImageClassification(compositeImg):
-# 	if ensemble == False:
-# 		# Load the best model from the classifier list
-# 		classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
-#
-# 		# Train the classifier with the collection
-# 		trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
-#
-# 		# Classify the image
-# 		classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-#
-# 	if ensemble == True:
-# 		def classifyImage(classifierName):
-# 			# Load the best model from the classifier list
-# 			classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
-#
-# 			# Train the classifier with the collection
-# 			trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
-#
-# 			# Classify the image
-# 			classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
-#
-# 			return classifiedImage
-#
-# 		# Classify the images, return mean
-# 		classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
-#
-# 	return classifiedImage
-#
-# # Create appropriate composite image with bands to use
-# if setup == 'wpixelAgg_wProjectVars':
-# 	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-# if setup == 'wpixelAgg_woProjectVars':
-# 	compositeToClassify = compositeOfInterest
-# if setup == 'wopixelAgg_wProjectVars':
-# 	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-# if setup == 'wopixelAgg_woProjectVars':
-# 	compositeToClassify = compositeOfInterest
-# if setup == 'distictObs_wProjectVars':
-# 	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
-# if setup == 'distictObs_woProjectVars':
-# 	compositeToClassify = compositeOfInterest
-
-# image_toExport = finalImageClassification(compositeToClassify)
-
-# imgExport = ee.batch.Export.image.toAsset(
-#     image = image_toExport.toFloat(),
-#     description = classProperty+'classifiedImg_wFuturePreds',
-#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'classifiedImg_wFuturePreds' ,
-#     crs = 'EPSG:4326',
-#     crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-#     region = exportingGeometry,
-#     maxPixels = int(1e13),
-#     pyramidingPolicy = {".default": pyramidingPolicy}
-# )
-# imgExport.start()
-#
-# print('Image export started')
-
-
-##################################################################################################################################################################
-##################################################################################################################################################################
-##################################################################################################################################################################
-##################################################################################################################################################################
 # Predicted - Observed
 ##################################################################################################################################################################
 fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -895,12 +807,125 @@ if pixel_agg == False:
 
 # Write to file
 if log_transform_classProperty == True:
-	predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_zeroInflated_'+setup+'_logTransformed'+'_wTedersoo'+'.csv')
+	predObs_df.to_csv('output/20220510_'+classProperty+'_pred_obs_zeroInflated_'+setup+'_logTransformed'+'.csv')
 
 if log_transform_classProperty == False:
-	predObs_df.to_csv('output/20220504_'+classProperty+'_pred_obs_zeroInflated_'+setup+'_wo_logTransformed'+'_wTedersoo'+'.csv')
+	predObs_df.to_csv('output/20220510_'+classProperty+'_pred_obs_zeroInflated_'+setup+'_wo_logTransformed'+'.csv')
 
 print('done')
+
+#################################################################################################################################################################
+# Classify image
+#################################################################################################################################################################
+# Reference covariate levels for mapping:
+# top: 0
+# bot: 10
+# core.length: 10
+# Sample.type: soil
+# target_marker: Illumina
+# target_marker: ITS2
+# Primers: ITS3/ITS4
+#
+# Sample FMS17564v2 has the reference levels:
+# rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']
+
+# Project-specific variables
+# top = ee.Image.constant(0)
+# bot = ee.Image.constant(10)
+# corelength = ee.Image.constant(10)
+target_marker = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['target_marker']))
+sequencing_platform = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sequencing_platform']))
+sample_type = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['sample_type']))
+primers = ee.Image.constant(int(rawPointCollection[rawPointCollection['sample_id'] == 'FMS17564v2']['primers']))
+
+constant_imgs = ee.ImageCollection.fromImages([target_marker, sequencing_platform, sample_type, primers]).toBands().rename(['target_marker', 'sequencing_platform', 'sample_type', 'primers'])
+
+def finalImageClassification(compositeImg):
+	if ensemble == False:
+		# Load the best model from the classifier list
+		classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
+		classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', bestModelNameClassification).first()).get('c'))
+
+		# Train the classifier with the collection
+		# Regression
+		fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.eq('source', 'GlobalFungi')) #  train classifier only on data not equalling zero / remove Tedersoo data
+		trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+
+		# Classification
+		fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+		trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+
+		# Classify the image
+		classifiedImage_Regression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Regressed')
+		classifiedImage_Classification = compositeImg.classify(trainedClassiferClassification,classProperty+'_Classified').toInt()
+
+		# Calculate final predicted value as product of classification and regression
+		classifiedImage = classifiedFC_Regression.multiply(classifiedFC_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
+
+		return classifiedImage
+
+	if ensemble == True:
+		def classifyImage(classifierName):
+			modelNameRegression = ee.List(classifiers).get(0)
+			modelNameClassification = ee.List(classifiers).get(1)
+
+			# Load the best model from the classifier list
+			classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+			classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+
+			# Train the classifier with the collection
+			# REGRESSION
+			fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.eq('source', 'GlobalFungi')) #  train classifier only on data not equalling zero / remove Tedersoo data
+			trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+
+			# Classification
+			fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+			trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+
+			# Classify the FC
+			classifiedImage_Regression = fcOI.classify(trainedClassiferRegression,classProperty+'_Regressed')
+			classifiedImage_Classification = fcOI.classify(trainedClassiferClassification,classProperty+'_Classified')
+
+			# Calculate final predicted value as product of classification and regression
+			classifiedImage = classifiedFC_Regression.multiply(classifiedFC_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
+
+			return classifiedImage
+
+		# Classify the images, return mean
+		classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
+
+	return classifiedImage
+
+# Create appropriate composite image with bands to use
+if setup == 'wpixelAgg_wProjectVars':
+	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+if setup == 'wpixelAgg_woProjectVars':
+	compositeToClassify = compositeOfInterest
+if setup == 'wopixelAgg_wProjectVars':
+	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+if setup == 'wopixelAgg_woProjectVars':
+	compositeToClassify = compositeOfInterest
+if setup == 'distictObs_wProjectVars':
+	compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+if setup == 'distictObs_woProjectVars':
+	compositeToClassify = compositeOfInterest
+
+image_toExport = finalImageClassification(compositeToClassify)
+
+imgExport = ee.batch.Export.image.toAsset(
+    image = image_toExport.toFloat(),
+    description = classProperty+'classifiedImage_zeroInflated',
+    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'classifiedImage_zeroInflated' ,
+    crs = 'EPSG:4326',
+    crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+    region = exportingGeometry,
+    maxPixels = int(1e13),
+    pyramidingPolicy = {".default": pyramidingPolicy}
+)
+imgExport.start()
+
+print('Image export started')
+
 
 # ##################################################################################################################################################################
 # # Variable importance metrics
