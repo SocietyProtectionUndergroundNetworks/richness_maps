@@ -14,21 +14,9 @@ from multiprocessing import Value, Lock, Process
 
 ee.Initialize()
 
-currentClimate = ee.Image('projects/crowtherlab/t3/CHELSA/CHELSA_BioClim_1994_2013_180ArcSec')
+compositeToUse = ee.Image('projects/crowtherlab/t3/CHELSA/CHELSA_BioClim_1994_2013_180ArcSec')
 
-compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
-
-# landUse2015 = ee.ImageCollection([
-#   ssp1_rcp26_2015_mean_11PFTs,
-#   ssp2_rcp45_2015_mean_11PFTs,
-#   ssp3_rcp60_2015_mean_11PFTs,
-#   ssp4_rcp60_2015_mean_11PFTs,
-#   ssp5_rcp85_2015_mean_11PFTs]).mean().reproject(compositeImg.projection())
-#
-# compositeToUse = ee.Image.cat(currentClimate, compositeImg, landUse2015, urban_2015)
-
-# FeatureCollection to sample
-points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN/tedersoo/all_taxa_tedersoo_Ectomycorrhizal")
+points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN/tedersoo/all_taxa_tedersoo_Ectomycorrhizal").limit(1000)
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']
@@ -122,26 +110,37 @@ def generateGrid(region, size):
 @contextmanager
 def poolcontext(*args, **kwargs):
         """This just makes the multiprocessing easier with a generator."""
+        queue = multiprocessing.Queue()
         pool = multiprocessing.Pool(*args, **kwargs)
         yield pool
         pool.terminate()
         pool.join()
+#
+# if __name__ == '__main__':
+#         unboundedGeo = ee.Geometry.Polygon([[[-180, 88], [180, 88], [180, -88], [-180, -88]]], None, False);
+#
+#         GRID_WIDTH = 15  # How many grid cells to use.
+#         grids = generateGrid(unboundedGeo, GRID_WIDTH)
+#         size = grids.size().getInfo()
+#         print("Grid size: %d " % size)
+#
+#         NPROC = 40
+#         with poolcontext(NPROC) as pool:
+#             results = pool.map(
+#                     partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
+#                     range(0, size))
+#             # results = pd.concat(results)
+#             queue.put(results)
+#             # results.to_csv('tmp.csv')
+
+def f(q):
+    q.put([42, None, 'hello'])
 
 if __name__ == '__main__':
-        unboundedGeo = ee.Geometry.Polygon([[[-180, 88], [180, 88], [180, -88], [-180, -88]]], None, False);
+    q = multiprocessing.Queue()
+    p = multiprocessing.Process(target=f, args=(q,))
+    p.start()
+    print(q.get())    # prints "[42, None, 'hello']"
+    p.join()
 
-        GRID_WIDTH = 15  # How many grid cells to use.
-        grids = generateGrid(unboundedGeo, GRID_WIDTH)
-        size = grids.size().getInfo()
-        print("Grid size: %d " % size)
-
-        # How many concurrent processors to use.  If you're hitting lots of
-        # "Too many aggregation" errors (more than ~10/minute), then make this
-        # number smaller.  You should be able to always use at least 20.
-        NPROC = 40
-        with poolcontext(NPROC) as pool:
-                results = pool.map(
-                        partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
-                        range(0, size))
-                results = pd.concat(results)
-                results.to_csv('tmp.csv')
+print(q.get())

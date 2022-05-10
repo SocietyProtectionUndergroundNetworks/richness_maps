@@ -25,8 +25,8 @@ ee.Initialize()
 # 'distictObs_wProjectVars',
 # 'distictObs_woProjectVars',
 # ]
-setup = 'distictObs_wProjectVars'
 
+setup = 'distictObs_wProjectVars'
 ####################################################################################################################################################################
 # Configuration
 ####################################################################################################################################################################
@@ -42,7 +42,7 @@ classProperty = 'ECM_diversity'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_temp_log_zeroInflated_wTedersoo'
+projectFolder = '000_SPUN_zeroInflated'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -432,10 +432,10 @@ except Exception as e:
 	# Import the raw CSV
 	GF_data = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip')
 	GF_data['source'] = 'GlobalFungi'
-	tedersoo_data = pd.read_csv('data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv', float_precision='round_trip')
-	tedersoo_data['source'] = 'Tedersoo'
-
-	rawPointCollection = pd.concat([GF_data, tedersoo_data])
+	# tedersoo_data = pd.read_csv('data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv', float_precision='round_trip')
+	# tedersoo_data['source'] = 'Tedersoo'
+	#
+	# rawPointCollection = pd.concat([GF_data, tedersoo_data])
 
 	# Rename columnto be mapped
 	rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
@@ -516,132 +516,6 @@ except Exception as e:
 		time.sleep(normalWaitTime)
 	print('Moving on...')
 
-# ##################################################################################################################################################################
-# # Hyperparameter tuning
-# ##################################################################################################################################################################
-# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
-#
-# # Define hyperparameters for grid search
-# varsPerSplit_list = list(range(2,8))
-# leafPop_list = list(range(4,8))
-# classifierList = []
-#
-# # Create list of classifiers
-# for vps in varsPerSplit_list:
-# 	for lp in leafPop_list:
-#
-# 		model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp)
-#
-# 		rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
-# 		numberOfTrees = nTrees,
-# 		variablesPerSplit = vps,
-# 		minLeafPopulation = lp,
-# 		bagFraction = 0.632,
-# 		seed = 42
-# 		).setOutputMode('REGRESSION'))
-#
-# 		classifierList.append(rf)
-#
-# try:
-# 	# Grid search results as FC
-# 	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
-#
-# 	# Get top model name
-# 	bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
-#
-# 	# Get top 10 models
-# 	top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
-#
-# 	len(grid_search_results.first().getInfo())
-# except Exception as e:
-# #     # Make a feature collection from the k-fold assignment list
-# #     kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
-# #
-# #     # Perform grid search
-# #     hyperparameter_tuning = ee.FeatureCollection(list(map(computeCVAccuracyAndRMSE,classifierList)))
-# #
-# #     # Export to assets
-# #     gridSearchExport = ee.batch.Export.table.toAsset(
-# #     	collection = hyperparameter_tuning,
-# #     	description = classProperty+'grid_search_results',
-# #     	assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation'
-# #     )
-# #     gridSearchExport.start()
-# #
-# #     # !! Break and wait
-# #     count = 1
-# #     while count >= 1:
-# #     	taskList = [str(i) for i in ee.batch.Task.list()]
-# #     	subsetList = [s for s in taskList if classProperty in s]
-# #     	subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-# #     	count = len(subsubList)
-# #     	print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for grid search to complete...')
-# #     	time.sleep(normalWaitTime)
-# #     print('Moving on...')
-# #
-# #     # Grid search results as FC
-# #     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'grid_search_results_woAggregation')
-#
-# 	# Make a feature collection from the k-fold assignment list
-# 	kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
-#
-# 	classDf = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
-#
-# 	for rf in classifierList:
-# 		print('Testing model', classifierList.index(rf), 'out of total of', len(classifierList))
-#
-# 		accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
-#
-# 		classDf = classDf.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
-#
-# 	classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
-#
-# 	# Write model results to csv
-# 	classDfSorted.to_csv('output/'+classProperty+setup+'_grid_search_results_tmp.csv', index=False)
-#
-# 	# Format the bash call to upload the file to the Google Cloud Storage bucket
-# 	gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_tmp.csv']+[formattedBucketOI]
-# 	subprocess.run(gsutilBashUploadList)
-# 	print('grid_search_results'+' uploaded to a GCSB!')
-#
-# 	# Wait for a short period to ensure the command has been received by the server
-# 	time.sleep(normalWaitTime/2)
-#
-# 	# Wait for the GSUTIL uploading process to finish before moving on
-# 	while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_tmp']):
-# 		print('Not everything is uploaded...')
-# 		time.sleep(normalWaitTime)
-# 	print('Everything is uploaded; moving on...')
-#
-# 	# Upload the file into Earth Engine as a table asset
-# 	assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation'
-# 	earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_tmp.csv']+arglist_postEEUploadTable
-# 	subprocess.run(earthEngineUploadTableCommands)
-# 	print('Upload to EE queued!')
-#
-# 	# Wait for a short period to ensure the command has been received by the server
-# 	time.sleep(normalWaitTime/2)
-#
-# 	# !! Break and wait
-# 	count = 1
-# 	while count >= 1:
-# 		taskList = [str(i) for i in ee.batch.Task.list()]
-# 		subsetList = [s for s in taskList if classProperty in s]
-# 		subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-# 		count = len(subsubList)
-# 		print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
-# 		time.sleep(normalWaitTime)
-# 	print('Moving on...')
-#
-# 	# Grid search results as FC
-# 	grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'grid_search_results_woAggregation')
-#
-# 	# Get top model name
-# 	bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
-#
-# 	# Get top 10 models
-# 	top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
-
 ##################################################################################################################################################################
 # Hyperparameter tuning
 ##################################################################################################################################################################
@@ -707,11 +581,10 @@ except Exception as e:
 	classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
 	classDfClassification = pd.DataFrame(columns = ['Mean_overallAccuracy', 'StDev_overallAccuracy', 'cName'])
 
-	def gridSearch(rf):
-
+	for rf in classifierListRegression:
 		print('Testing model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression))
-		print(rf.get('cName').getInfo())
-		# train classifier only on data not equalling zero
+
+		#  train classifier only on data not equalling zero
 		# train classifier only on GlobalFungi data
 		fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
 				.filter(ee.Filter.neq(classProperty, 0))\
@@ -719,29 +592,8 @@ except Exception as e:
 		accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 
 		classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
-		return classDfRegression
-
-	number_of_processes = 6
-
-	@contextmanager
-	def poolcontext(*args, **kwargs):
-		"""This just makes the multiprocessing easier with a generator."""
-		pool = multiprocessing.Pool(*args, **kwargs)
-		yield pool
-		pool.terminate()
-
-	if __name__ == '__main__':
-
-		with poolcontext(number_of_processes) as pool:
-
-			results = pool.map(gridSearch, classifierListRegression)
-			results = pd.concat(results)
-			with open('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', 'a') as f:
-				results.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'], index=False, mode='a', header=f.tell()==0)
-			print('done')
 
 	for rf in classifierListClassification:
-		print('class')
 		print('Testing model', classifierListClassification.index(rf), 'out of total of', len(classifierListClassification))
 
 		fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -1571,18 +1423,3 @@ print('done')
 #
 #
 # print('All tasks started! Output files will apear in this folder: users/'+usernameFolderString+'/'+projectFolder)
-#
-# number_of_processes = 6
-#
-# @contextmanager
-# def poolcontext(*args, **kwargs):
-# 	"""This just makes the multiprocessing easier with a generator."""
-# 	pool = multiprocessing.Pool(*args, **kwargs)
-# 	yield pool
-# 	pool.terminate()
-#
-# if __name__ == '__main__':
-#
-# 	with poolcontext(number_of_processes) as pool:
-#
-# 			results = pool.map(pipeline, covariateSet)
