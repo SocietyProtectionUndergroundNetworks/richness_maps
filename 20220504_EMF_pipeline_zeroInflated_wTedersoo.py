@@ -686,7 +686,7 @@ def pipeline(setup):
 			classifierListClassification.append(rf)
 	try:
 		# Grid search results as FC
-		grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression').filter(ee.Filter.eq('source', 'GlobalFungi'))
+		grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression')
 		grid_search_resultsClassification = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Classification')
 
 		# Get top model name

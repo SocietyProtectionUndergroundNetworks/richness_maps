@@ -38,7 +38,7 @@ usernameFolderString = 'johanvandenhoogen'
 bucketOfInterest = 'johanvandenhoogen'
 
 # Input the name of the classification property
-classProperty = 'ECM_diversity'
+classProperty = 'AMF_diversity'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
@@ -158,7 +158,7 @@ k = 10
 kList = list(range(1,k+1))
 
 # Set number of trees in RF models
-nTrees = 500
+nTrees = 250
 
 # Input the name of the property that holds the CV fold assignment
 cvFoldString = 'CV_Fold'
@@ -421,6 +421,26 @@ else:
 ####################################################################################################################################################################
 # Data processing
 ####################################################################################################################################################################
+# Import the raw CSV
+GF_data = pd.read_csv('data/20211026_AMF_diversity_data_sampled.csv', float_precision='round_trip')
+GF_data['source'] = 'GlobalFungi'
+# tedersoo_data = pd.read_csv('data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv', float_precision='round_trip')
+# tedersoo_data['source'] = 'Tedersoo'
+#
+# rawPointCollection = pd.concat([GF_data, tedersoo_data])
+rawPointCollection = GF_data
+
+# Rename columnto be mapped
+rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
+
+# Convert factors to integers
+rawPointCollection = rawPointCollection.assign(sequencing_platform = (rawPointCollection['sequencing_platform']).astype('category').cat.codes)
+rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection['sample_type']).astype('category').cat.codes)
+rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
+rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_marker']).astype('category').cat.codes)
+
+# Print basic information on the csv
+print('Original Collection', rawPointCollection.shape[0])
 try:
 	# try whether fcOI is present
 	fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -428,27 +448,6 @@ try:
 	fcOI.size().getInfo()
 
 except Exception as e:
-
-	# Import the raw CSV
-	GF_data = pd.read_csv('data/20211026_ECM_diversity_data_sampled.csv', float_precision='round_trip')
-	GF_data['source'] = 'GlobalFungi'
-	# tedersoo_data = pd.read_csv('data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv', float_precision='round_trip')
-	# tedersoo_data['source'] = 'Tedersoo'
-	#
-	# rawPointCollection = pd.concat([GF_data, tedersoo_data])
-	rawPointCollection = GF_data
-
-	# Rename columnto be mapped
-	rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
-
-	# Convert factors to integers
-	rawPointCollection = rawPointCollection.assign(sequencing_platform = (rawPointCollection['sequencing_platform']).astype('category').cat.codes)
-	rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection['sample_type']).astype('category').cat.codes)
-	rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
-	rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_marker']).astype('category').cat.codes)
-
-	# Print basic information on the csv
-	print('Original Collection', rawPointCollection.shape[0])
 
 	# Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
 	fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
@@ -561,7 +560,7 @@ for vps in varsPerSplit_list:
 		classifierListClassification.append(rf)
 try:
 	# Grid search results as FC
-	grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression').filter(ee.Filter.eq('source', 'GlobalFungi'))
+	grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression')
 	grid_search_resultsClassification = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Classification')
 
 	# Get top model name
@@ -579,6 +578,7 @@ except Exception as e:
 	# Make a feature collection from the k-fold assignment list
 	kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
 
+	finished_models_regression = list()
 	try:
 		# Check if any models have been completed
 		classDfRegression = pd.read_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv')
@@ -604,6 +604,7 @@ except Exception as e:
 			classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
 			classDfRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', index=False)
 
+	finished_models_classification = list()
 	try:
 		# Check if any models have been completed
 		classDfClassification = pd.read_csv('output/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv')
@@ -662,10 +663,10 @@ except Exception as e:
 
 	# Upload the file into Earth Engine as a table asset
 	assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression'
-	earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Regression.csv']+arglist_postEEUploadTable
+	earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv']+arglist_postEEUploadTable
 	subprocess.run(earthEngineUploadTableCommands)
 	assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Classification'
-	earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Classification.csv']+arglist_postEEUploadTable
+	earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv']+arglist_postEEUploadTable
 	subprocess.run(earthEngineUploadTableCommands)
 	print('Upload to EE queued!')
 
@@ -723,7 +724,7 @@ except Exception as e:
 			trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
 			# Classification
-			fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+			fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('AMF_diversity')).divide(f.get('AMF_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
 			trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
 			# Classify the FC
@@ -756,7 +757,7 @@ except Exception as e:
 				trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
 				# Classification
-				fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+				fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('AMF_diversity')).divide(f.get('AMF_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
 				trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
 				# Classify the FC
@@ -793,6 +794,7 @@ except Exception as e:
 
 	# Add residuals to FC
 	predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
+
 
 	# Export to Assets
 	predObsexport = ee.batch.Export.table.toAsset(
@@ -877,7 +879,7 @@ def finalImageClassification(compositeImg):
 		trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
 		# Classification
-		fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+		fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('AMF_diversity')).divide(f.get('AMF_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
 		trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
 		# Classify the image
@@ -885,12 +887,12 @@ def finalImageClassification(compositeImg):
 		classifiedImage_Classification = compositeImg.classify(trainedClassiferClassification,classProperty+'_Classified').toInt()
 
 		# Calculate final predicted value as product of classification and regression
-		classifiedImage = classifiedFC_Regression.multiply(classifiedFC_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
+		classifiedImage = classifiedImage_Regression.multiply(classifiedImage_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
 
 		return classifiedImage
 
 	if ensemble == True:
-		def classifyImage(classifierName):
+		def classifyImage(classifiers):
 			modelNameRegression = ee.List(classifiers).get(0)
 			modelNameClassification = ee.List(classifiers).get(1)
 
@@ -904,20 +906,20 @@ def finalImageClassification(compositeImg):
 			trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
 			# Classification
-			fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('ECM_diversity')).divide(f.get('ECM_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+			fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get('AMF_diversity')).divide(f.get('AMF_diversity')))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
 			trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
 			# Classify the FC
-			classifiedImage_Regression = fcOI.classify(trainedClassiferRegression,classProperty+'_Regressed')
-			classifiedImage_Classification = fcOI.classify(trainedClassiferClassification,classProperty+'_Classified')
+			classifiedImage_Regression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Regressed')
+			classifiedImage_Classification = compositeImg.classify(trainedClassiferClassification,classProperty+'_Classified')
 
 			# Calculate final predicted value as product of classification and regression
-			classifiedImage = classifiedFC_Regression.multiply(classifiedFC_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
+			classifiedImage = classifiedImage_Regression.multiply(classifiedImage_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
 
 			return classifiedImage
 
 		# Classify the images, return mean
-		classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
+		classifiedImage = ee.ImageCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyImage)).mean()
 
 	return classifiedImage
 
@@ -936,6 +938,8 @@ if setup == 'distictObs_woProjectVars':
 	compositeToClassify = compositeOfInterest
 
 image_toExport = finalImageClassification(compositeToClassify)
+
+image_toExport = image_toExport.select(classProperty+'_Predicted').exp().addBands(image_toExport.select(classProperty+'_Regressed').exp()).addBands(image_toExport.select(classProperty+'_Classified'))
 
 imgExport = ee.batch.Export.image.toAsset(
     image = image_toExport.toFloat(),
