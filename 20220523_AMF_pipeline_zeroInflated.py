@@ -823,7 +823,7 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 if log_transform_classProperty == True:
 	predObs_df[classProperty+'_Predicted'] = np.exp(predObs_df[classProperty+'_Predicted']) - 1
 	predObs_df[classProperty+'_Regressed'] = np.exp(predObs_df[classProperty+'_Regressed']) - 1
-	predObs_df[classProperty+'_Classified'] = np.exp(predObs_df[classProperty+'_Classified']) - 1
+	predObs_df[classProperty+'_Classified'] = predObs_df[classProperty+'_Classified'])
 	predObs_df[classProperty] = np.exp(predObs_df[classProperty]) - 1
 	predObs_df['AbsResidual'] = np.exp(predObs_df['AbsResidual'])
 
@@ -940,11 +940,11 @@ if setup == 'distictObs_woProjectVars':
 classifiedImage = finalImageClassification(compositeToClassify)
 
 if log_transform_classProperty == True:
-	regressedImage = classifiedImage.select(classProperty+'_Regressed').exp()
+	regressedImage = classifiedImage.select(classProperty+'_Regressed').exp().subtract(1)
 if log_transform_classProperty == False:
 	regressedImage = classifiedImage.select(classProperty+'_Regressed')
 classifiedImage = classifiedImage.select(classProperty+'_Classified')
-finalPredictedImage = regressedImage.multiply(classifiedImage)
+finalPredictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'_Predicted')
 
 image_toExport = ee.Image.cat(regressedImage, classifiedImage, finalPredictedImage)
 

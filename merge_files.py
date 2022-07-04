@@ -1,7 +1,7 @@
 from os import listdir
 from os.path import isfile, join
 
-fout=open("data/20220509_all_taxa_tedersoo_Ectomycorrhizal_sampled.csv","a")
+fout=open("data/20220613_all_taxa_tedersoo_Ectomycorrhizal.csv","a")
 
 # sampled_data = [f for f in listdir("data/sampled_data") if isfile(join("data/sampled_data", f))]
 

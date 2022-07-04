@@ -944,7 +944,7 @@ if log_transform_classProperty == True:
 if log_transform_classProperty == False:
 	regressedImage = classifiedImage.select(classProperty+'_Regressed')
 classifiedImage = classifiedImage.select(classProperty+'_Classified')
-finalPredictedImage = regressedImage.multiply(classifiedImage)
+finalPredictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'_Predicted')
 
 image_toExport = ee.Image.cat(regressedImage, classifiedImage, finalPredictedImage)
 
