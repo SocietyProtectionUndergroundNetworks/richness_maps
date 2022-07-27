@@ -809,7 +809,7 @@ if pixel_agg == False:
 
 predObs_df.to_csv('output/20220714_'+classProperty+'_pred_obs_zeroInflated_'+setup+'.csv')
 
-print('done')
+print('Predicted Observed done, moving on...')
 
 #################################################################################################################################################################
 # Classify image
