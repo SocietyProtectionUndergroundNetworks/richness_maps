@@ -777,9 +777,7 @@ except Exception as e:
 		predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
 
 	# Add residuals to FC
-	predObs.filterMetadata('system:id', 'equals', '0_00000000000000000024').getInfo()
 	predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
-	predObs_wResiduals.first().getInfo()
 
 	# Export to Assets
 	predObsexport = ee.batch.Export.table.toAsset(
