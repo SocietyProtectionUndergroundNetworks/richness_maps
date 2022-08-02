@@ -844,7 +844,7 @@ def finalImageClassification(compositeImg):
 		classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', bestModelNameClassification).first()).get('c'))
 
 		# Train the classifier with the collection
-		# Regression
+		# REGRESSION
 		fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.eq('source', 'GlobalFungi')) #  train classifier only on data not equalling zero / remove Tedersoo data
 		trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
@@ -852,14 +852,16 @@ def finalImageClassification(compositeImg):
 		fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
 		trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
-		# Classify the image
+		# Classify the FC
 		classifiedImage_Regression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Regressed')
-		classifiedImage_Classification = compositeImg.classify(trainedClassiferClassification,classProperty+'_Classified').toInt()
+		classifiedImage_Classification = compositeImg.classify(trainedClassiferClassification,classProperty+'_Classified')
 
 		# Calculate final predicted value as product of classification and regression
-		classifiedImage = classifiedImage_Regression.multiply(classifiedImage_Classification).rename(classProperty+'_Predicted').addBands(classifiedImage_Regression).addBands(classifiedImage_Classification)
+		classifiedImage = classifiedImage_Regression.multiply(classifiedImage_Classification).rename(classProperty+'_Predicted')
 
-		return classifiedImage
+		finalImage = ee.Image.cat(classifiedImage, classifiedImage_Regression, classifiedImage_Classification)
+
+		return finalImage
 
 	if ensemble == True:
 		def classifyImage(classifiers):
@@ -887,12 +889,16 @@ def finalImageClassification(compositeImg):
 			classifiedImage = classifiedImage_Regression.multiply(classifiedImage_Classification).rename(classProperty+'_Predicted')
 
 			finalImage = ee.Image.cat(classifiedImage, classifiedImage_Regression, classifiedImage_Classification)
+
 			return finalImage
 
 		# Classify the images, return mean
-		classifiedImage = ee.ImageCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyImage)).mean()
-
+		# classifiedImage = ee.ImageCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyImage)).mean()
+		classifiedImage_Regression = ee.ImageCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyImage)).select(classProperty+'_Regressed').mean()
+		classifiedImage_Classification = ee.ImageCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyImage)).select(classProperty+'_Classified').mode()
+		classifiedImage = classifiedImage_Regression.addBands(classifiedImage_Classification)
 	return classifiedImage
+
 
 # Create appropriate composite image with bands to use
 if setup == 'wpixelAgg_wProjectVars':
@@ -928,6 +934,21 @@ imgExport = ee.batch.Export.image.toAsset(
     region = exportingGeometry,
     maxPixels = int(1e13),
     pyramidingPolicy = {".default": pyramidingPolicy}
+)
+# imgExport.start()
+
+print('Image export started')
+
+# TEMP export to drive
+imgExport = ee.batch.Export.image.toDrive(
+    image = image_toExport.toFloat(),
+    description = classProperty+'classifiedImage_zeroInflated',
+    # assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'classifiedImage_zeroInflated' ,
+    crs = 'EPSG:4326',
+    crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+    region = exportingGeometry,
+    maxPixels = int(1e13),
+    # pyramidingPolicy = {".default": pyramidingPolicy}
 )
 imgExport.start()
 

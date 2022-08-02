@@ -930,8 +930,6 @@ classifiedImage = finalImageClassification(compositeToClassify)
 
 if log_transform_classProperty == True:
 	regressedImage = classifiedImage.select(classProperty+'_Regressed').exp()
-if log_transform_classProperty == False:
-	regressedImage = classifiedImage.select(classProperty+'_Regressed')
 classifiedImage = classifiedImage.select(classProperty+'_Classified')
 finalPredictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'_Predicted')
 
@@ -951,43 +949,6 @@ imgExport.start()
 
 print('Image export started')
 
-# ##################################################################################################################################################################
-# Inverse Distance Weighted Interpolation
-# ##################################################################################################################################################################
-
-# Fetch FC with residuals
-predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_zeroInflated_'+setup+'_logTransformed')
-
-# Combine mean and SD reducers
-combinedReducer = ee.Reducer.mean()\
-                            .combine(reducer2 = ee.Reducer.stdDev(),
-                                     sharedInputs = True)
-
-# Estimate global mean and standard deviation from the points
-stats = predObs_wResiduals.reduceColumns(reducer = combinedReducer,
-                                             selectors = ['AbsResidual'])
-
-# interpolate residuals to 50 kilometers
-interpolatedResidualsImg = predObs_wResiduals.inverseDistance(range = 50 * 1000,
-                                                          propertyName = 'AbsResidual',
-                                                          mean = stats.get('mean'),
-                                                          stdDev = stats.get('stdDev'),
-                                                          gamma = 0.5)
-
-# Export image
-imgExport = ee.batch.Export.image.toAsset(
-    image = interpolatedResidualsImg.toFloat(),
-    description = classProperty+'interpolatedResidualsImg',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'interpolatedResidualsImg' ,
-    crs = 'EPSG:4326',
-    crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
-    region = exportingGeometry,
-    maxPixels = int(1e13),
-    pyramidingPolicy = {".default": pyramidingPolicy}
-)
-imgExport.start()
-
-print('Image export started')
 
 # ##################################################################################################################################################################
 # # Variable importance metrics
