@@ -1,0 +1,208 @@
+---
+title: "Data preparation for spatial variables (RFSI approach)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+Random Forest Spatial Interpolation method was proposed by [Sekulić et al. 2020](https://github.com/AleksandarSekulic/RFSI), with the main novelty is that it uses observations at n nearest locations and distances from these locations to the prediction location as spatial covariates to improve accuracy of RF. Authors noted that the proper way to assess accuracy of the RFSI model is by using the nested k-fold cross-validation (cv.rfsi function of the R package `meteo`, Sekulić et al. 2020b).
+
+![Main idea behind RFSI](https://github.com/SocietyProtectionUndergroundNetworks/diversity_explore/blob/main/sekulic2020RFSI.png)
+
+The automated functions for RFSI modelling, prediction, tuning, and cross-validation are implemented in the R package `meteo`, but **most of them are currently broken**.
+
+The following code is based on `meteo` functions, but modified (shortened, bugs fixed).
+
+So, inputs are
+
+1. csv with the points for building a RF model, with Lat-Lon coordinates, without duplicates
+2. single-band raster with any variable for prediction over.
+
+Outputs are
+
+1. csv with additional spatial covariates (distances and values for n nearest points)
+2. multi-band tiff with additional spatial predictors
+
+# Clean environment and load libraries
+```{r, collapse=TRUE}
+rm(list = ls()) # reset R's brain
+
+# load observation - data.frame of mean temperatures
+library(data.table)
+library(sf)
+library(sp)
+library(tidyverse)
+library(nabor) # for knn function (Find K nearest neighbors for multiple query points)
+library(raster)
+```
+
+Function to retrieve n nearest observations with distances to them. Works both for vector data (for generating spatial covariates) and raster data (for creating similar variables for prediction).
+
+Based on `near.obs` function from `meteo` package, but modified.
+Nearest neighbors retrieved using `knn` function of `nabor` [package](https://github.com/jefferis/nabor), - need checking of spatial algebra in future. `knn` seemingly calculates Euclidean distances, which are wrong in terms of spatial statistics, but still does the job (detecting closer and further points). If the methods will seem of use, I will try to replace it with spatial distances.
+
+```{r}
+# Custom function to retrieve n nearest observation from the SpatialPointDataFrame
+# and write the their values as variables into the new dataframe altogether with 
+# the distances to them from focal points.
+# Modified from https://github.com/AleksandarSekulic/Rmeteo/blob/master/R/near.obs.R 
+
+near.obs <- function(
+    locations,
+    locations.x.y = c(1,2),
+    observations,
+    observations.x.y = c(1,2),
+    zcol = 3,
+    n.obs = 10,
+    rm.dupl = TRUE
+)
+{
+  if (class(locations) == "SpatialPoints" ||
+      class(locations) == "SpatialPointsDataFrame" ||
+      class(locations) == "SpatialPixelsDataFrame") {
+    locations <- coordinates(locations)
+  } else {
+    locations <- locations[, locations.x.y]
+  }
+  if (class(observations) == "SpatialPoints" || class(observations) == "SpatialPointsDataFrame") {
+    variable <- observations[[zcol]]
+    observations <- coordinates(observations)
+  } else {
+    variable <- observations[, zcol]
+    observations <- observations[, observations.x.y]
+  }
+  
+  if (nrow(observations) < (n.obs+1)) {
+    # return NA
+    nl_df <- matrix(NA, nrow = nrow(locations), ncol = (2*n.obs))
+  } else {
+    # if (identical(locations, observations)){
+    if (rm.dupl){
+      knn1 <- nabor::knn(observations, locations, k=n.obs+1)
+      knn1$nn.idx[round(knn1$nn.dists[, 1]) == 0, 1:n.obs] <- knn1$nn.idx[round(knn1$nn.dists[, 1]) == 0, -1]
+      knn1$nn.idx <- knn1$nn.idx[, -(n.obs+1)]
+      knn1$nn.dists[round(knn1$nn.dists[, 1]) == 0, 1:n.obs] <- knn1$nn.dists[round(knn1$nn.dists[, 1]) == 0, -1]
+      knn1$nn.dists <- knn1$nn.dists[, -(n.obs+1)]
+    } else {
+      knn1 <- nabor::knn(observations, locations, k=n.obs)
+    }
+    
+    if(class(knn1$nn.idx)[[2]]!='integer') {
+      near_o1 <- apply(knn1$nn.idx, 2, function(x) {variable[x]})
+      near_o1 <- cbind(near_o1)
+      nl_df <- cbind(knn1$nn.dists, near_o1)
+    } else {
+      near_o1 <- variable[knn1$nn.idx]
+      nl_df <- t(c(knn1$nn.dists, near_o1))
+    }
+  }
+  
+  name1 <- c()
+  name2 <- c()
+  for (i in 1:n.obs) {
+    name1 <- c(name1, paste("dist", i, sep = ""))
+    name2 <- c(name2, paste("obs", i, sep = ""))
+  }
+  all_names <- c(name1, name2)
+  
+  nl_df <- as.data.frame(nl_df)
+  names(nl_df) <- all_names
+  
+  return(nl_df)
+  
+}
+```
+
+# Read and transform data.
+
+Input data should be csv with "Pixel_Long", "Pixel_Lat" fields, **without duplicates**. Though `near.obs` calculates even with duplicates, it will mess up with RF, since the different values will be associated with the same distances from each of duplicated point. 
+
+In this example case, I took original csv for ECM fungi just for illustrating reasons. 
+
+```{r}
+# read point data an transform to spdf object
+datapoints <- fread('20211026_ECM_diversity_data_sampled.csv') %>%
+  dplyr::select(myco_diversity, Pixel_Lat, Pixel_Long) %>%
+  as.data.frame() %>%
+  drop_na() %>%
+  st_as_sf(coords = c("Pixel_Long", "Pixel_Lat"), crs = 4326) %>% 
+  cbind(st_coordinates(.)) %>%
+  mutate(myco_diversity_log = log1p(myco_diversity)) %>% # log transformation of diversity metric
+  dplyr::select(X, Y, myco_diversity_log) %>%
+  as("Spatial") # save as SpatialPointsDataFrame
+
+
+# read raster for prediction and transform to spdf object.
+# no need to include into the raster all the predictor layers. It might have just 
+# one of them, because we use it only as spatial grid for calculation of additional
+# spatial predictors which we will add to the other variables for predict over.
+custom_raster <- raster("Soudzilovskaia_AM_proportion_10min.tif") # import tiff (testing)
+test_global_raster <- as(custom_raster, "SpatialPixelsDataFrame") # convert to sp df
+
+spplot(test_global_raster)
+```
+
+# Create new spatial variables
+## New variables for data points
+Retrieve 5 nearest observations and distances to them for each of sampling point (removing duplicates isn't working out of the box).
+
+```{r}
+# find 5 nearest observations and distances to them (remove duplicates)
+nearest_obs <- near.obs(locations = datapoints,
+                        observations = datapoints,
+                        zcol = "myco_diversity_log",
+                        n.obs = 5,
+                        rm.dupl = TRUE)
+head(nearest_obs)
+```
+
+
+
+
+## Create new variables for prediction over raster
+
+```{r}
+nearest_pred <- near.obs(locations = test_global_raster,
+                         observations = datapoints,
+                         zcol = "myco_diversity_log",
+                         n.obs = 5,
+                         rm.dupl = TRUE)
+
+summary(nearest_pred)
+```
+
+Since the output is a dataframe, we need to add them into original raster to make it spatial 
+
+```{r}
+raster_merged <- cbind(test_global_raster, nearest_pred)
+
+# first variable is original one, the rest are newly generated spatial predictors
+head(raster_merged@data)
+```
+
+Each new variables shows either distance to or value of one of the 5 nearest data points for each pixel. 
+```{r}
+plot(raster_merged[8])
+```
+
+# Write new data
+Write new spatial variables for point data as csv
+
+```{r}
+write.csv(nearest_obs, "nearest_observations.csv")
+```
+
+
+Write distances and observation values for prediction as a multi-band tiff
+
+```{r}
+spatial_predictors <- brick(raster_merged[2:11]) # save as raster brick
+plot(spatial_predictors)
+
+writeRaster(spatial_predictors,
+            filename = "spatial_predictors.tif",
+            overwrite=TRUE)
+```

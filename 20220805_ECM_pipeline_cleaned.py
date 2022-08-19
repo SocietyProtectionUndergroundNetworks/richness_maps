@@ -819,7 +819,7 @@ print('Predicted Observed done, moving on...')
 # bot: 10
 # core.length: 10
 # Sample.type: soil
-# target_marker: Illumina
+# sequencing_platform: Illumina
 # target_marker: ITS2
 # Primers: ITS3/ITS4
 #
@@ -917,7 +917,7 @@ if setup == 'distictObs_woProjectVars':
 classifiedImage = finalImageClassification(compositeToClassify)
 
 if log_transform_classProperty == True:
-	regressedImage = classifiedImage.select(classProperty+'_Regressed').exp()
+	regressedImage = classifiedImage.select(classProperty+'_Regressed').exp().subtract(1)
 if log_transform_classProperty == False:
 	regressedImage = classifiedImage.select(classProperty+'_Regressed')
 classifiedImage = classifiedImage.select(classProperty+'_Classified')
