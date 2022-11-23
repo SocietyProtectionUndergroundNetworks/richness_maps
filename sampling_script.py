@@ -100,7 +100,7 @@ compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_
 # compositeToUse = ee.Image.cat(currentClimate, compositeImg, landUse2015, urban_2015)
 
 # FeatureCollection to sample
-points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4/20221111_GFv4_richness_rarefied")
+points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_2/20221121_GFv4_richness_rarefied")
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']
@@ -215,4 +215,4 @@ if __name__ == '__main__':
 						partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
 						range(0, size))
 				results = pd.concat(results)
-				results.to_csv("data/20221117_GFv4_richness_rarefied_sampled.csv")
+				results.to_csv("data/20221122_GFv4_richness_rarefied_sampled.csv")
