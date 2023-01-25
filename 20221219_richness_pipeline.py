@@ -245,11 +245,13 @@ def pipeline(guild):
 	arglist_CreateFolder = ['create','folder']
 	arglist_Detect = ['asset','info']
 	arglist_Delete = ['rm','-r']
+	arglist_ls = ['ls']
 	stringsOfInterest = ['Asset does not exist or is not accessible']
 
 	# Compose the arguments into lists that can be run via the subprocess module
 	bashCommandList_Detect = [bashFunction_EarthEngine]+arglist_Detect
 	bashCommandList_Delete = [bashFunction_EarthEngine]+arglist_Delete
+	bashCommandList_ls = [bashFunction_EarthEngine]+arglist_ls
 	bashCommandList_CreateCollection = [bashFunction_EarthEngine]+arglist_CreateCollection
 	bashCommandList_CreateFolder = [bashFunction_EarthEngine]+arglist_CreateFolder
 
@@ -417,12 +419,29 @@ def pipeline(guild):
 		# Sleep to allow the server time to receive incoming requests
 		time.sleep(normalWaitTime/2)
 
+	assetIDToCreate_Folder = 'users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning'
+	if any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
+		pass
+	else:
+		# perform the folder creation
+		print(assetIDToCreate_Folder,'being created...')
+
+		# Create the folder within Earth Engine
+		subprocess.run(bashCommandList_CreateFolder+[assetIDToCreate_Folder])
+		while any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
+			print('Waiting for asset to be created...')
+			time.sleep(normalWaitTime)
+		print('Asset created!')
+
+		# Sleep to allow the server time to receive incoming requests
+		time.sleep(normalWaitTime/2)
+
 	####################################################################################################################################################################
 	# Data processing
 	####################################################################################################################################################################
 	# Import raw data
 	# Outliers removed (performed in R using 20221213_data_filtering.R)
-	rawPointCollection = pd.read_csv('data/20221219_GFv4_sampled_outliersRemoved.csv', float_precision='round_trip')
+	rawPointCollection = pd.read_csv('data/20230120_GFv4_sampled_outliersRemoved.csv', float_precision='round_trip')
 	rawPointCollection['source'] = 'GlobalFungi'
 	print('Size of original Collection', rawPointCollection.shape[0])
 
@@ -541,6 +560,7 @@ def pipeline(guild):
 	##################################################################################################################################################################
 	fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 	print(guild + ' hyperparameter tuning')
+
 	# Define hyperparameters for grid search
 	varsPerSplit_list = list(range(2,8))
 	leafPop_list = list(range(2,8))
@@ -612,6 +632,9 @@ def pipeline(guild):
 		# Create list of finished models
 		finished_models_regression = list(classDfRegression['cName'])
 
+		finished_models_regression = subprocess.run(bashCommandList_ls+['users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'], stdout=subprocess.PIPE).stdout.splitlines()
+		finished_models_regression = [model.decode('ascii').split('/')[-1] for model in finished_models_regression]
+		
 	except Exception as e:
 		classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
 
@@ -629,12 +652,9 @@ def pipeline(guild):
 			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 			accuracy_featureExport = ee.batch.Export.table.toAsset(
 				collection = ee.FeatureCollection([accuracy_feature]),
-				description = classProperty+rf.get('cName').getInfo()+'hyperparameterTuning',
-				assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+rf.get('cName').getInfo()+'hyperparameterTuning')
+				description = classProperty+rf.get('cName').getInfo(),
+				assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+classProperty+rf.get('cName').getInfo())
 			accuracy_featureExport.start()
-
-			# classDfRegression = classDfRegression.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
-			# classDfRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', index=False)
 
 	# Check if any models have been completed
 	finished_models_classification = list()
@@ -646,6 +666,7 @@ def pipeline(guild):
 
 	except Exception as e:
 		classDfClassification = pd.DataFrame(columns = ['Mean_overallAccuracy', 'StDev_overallAccuracy', 'cName'])
+
 
 	# Perform model testing for remaining hyperparameter settings
 	for rf in classifierListClassification:
@@ -661,12 +682,9 @@ def pipeline(guild):
 			accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
 			accuracy_featureExport = ee.batch.Export.table.toAsset(
 				collection = ee.FeatureCollection([accuracy_feature]),
-				description = classProperty+rf.get('cName').getInfo()+'hyperparameterTuning',
-				assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+rf.get('cName').getInfo()+'hyperparameterTuning')
+				description = rf.get('cName').getInfo(),
+				assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo())
 			accuracy_featureExport.start()
-
-			# classDfClassification = classDfClassification.append(pd.DataFrame(accuracy_feature.getInfo()['properties'], index = [0]))
-			# classDfClassification.to_csv('output/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv', index=False)
 
 	# !! Break and wait
 	count = 1
@@ -680,11 +698,23 @@ def pipeline(guild):
 	print('Moving on...')
 
 	# Fetch FC from GEE
-	grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+rf.get('cName').getInfo()+'hyperparameterTuning') for rf in classifierListRegression]).flatten()
+	grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()+'hyperparameterTuning') for rf in classifierListRegression]).flatten()
 	classDfRegression = GEE_FC_to_pd(grid_search_resultsRegression)
-	grid_search_resultsClassification = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+rf.get('cName').getInfo()+'hyperparameterTuning') for rf in classifierListClassification]).flatten()
+	grid_search_resultsClassification = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()+'hyperparameterTuning') for rf in classifierListClassification]).flatten()
 	classDfRegression = GEE_FC_to_pd(grid_search_resultsClassification)
 	
+	grid_search_resultsRegression_export = ee.batch.Export.table.toAsset(
+		collection = classDfRegression,
+		description = classProperty+'_Regression_grid_search_results',
+		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
+	grid_search_resultsRegression_export.start()
+
+	grid_search_resultsClassification_export = ee.batch.Export.table.toAsset(
+		collection = classDfClassification,
+		description = classProperty+'_Classification_grid_search_results',
+		assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Classification_grid_search_results')
+	grid_search_resultsClassification_export.start()
+
 	# Sort values
 	classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
 	classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy'], ascending = False)
@@ -692,56 +722,6 @@ def pipeline(guild):
 	# Write model results to csv
 	classDfSortedRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', index=False)
 	classDfSortedClassification.to_csv('output/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv', index=False)
-
-	# # Format the bash call to upload the file to the Google Cloud Storage bucket
-	# gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv']+[formattedBucketOI]
-	# subprocess.run(gsutilBashUploadList)
-	# print('grid_search_results'+' uploaded to a GCSB!')
-
-	# gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+['output/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv']+[formattedBucketOI]
-	# subprocess.run(gsutilBashUploadList)
-	# print('grid_search_results'+' uploaded to a GCSB!')
-
-	# # Wait for a short period to ensure the command has been received by the server
-	# time.sleep(normalWaitTime/2)
-
-	# # Wait for the GSUTIL uploading process to finish before moving on
-	# while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_Regression']):
-	# 	print('Not everything is uploaded...')
-	# 	time.sleep(normalWaitTime)
-	# print('Everything is uploaded; moving on...')
-
-	# while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in ['_grid_search_results_Classification']):
-	# 	print('Not everything is uploaded...')
-	# 	time.sleep(normalWaitTime)
-	# print('Everything is uploaded; moving on...')
-
-	# # Upload the file into Earth Engine as a table asset
-	# assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression'
-	# earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv']+arglist_postEEUploadTable
-	# subprocess.run(earthEngineUploadTableCommands)
-	# assetIdForGridSearchResults = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Classification'
-	# earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIdForGridSearchResults]+[formattedBucketOI+'/'+classProperty+setup+'_grid_search_results_Classification_zeroInflated.csv']+arglist_postEEUploadTable
-	# subprocess.run(earthEngineUploadTableCommands)
-	# print('Upload to EE queued!')
-
-	# # Wait for a short period to ensure the command has been received by the server
-	# time.sleep(normalWaitTime/2)
-
-	# # !! Break and wait
-	# count = 1
-	# while count >= 1:
-	# 	taskList = [str(i) for i in ee.batch.Task.list()]
-	# 	subsetList = [s for s in taskList if classProperty in s]
-	# 	subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-	# 	count = len(subsubList)
-	# 	print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
-	# 	time.sleep(normalWaitTime)
-	# print('Moving on...')
-
-	# # Grid search results as FC
-	# grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Regression')
-	# grid_search_resultsClassification = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+setup+'_grid_search_results_Classification')
 
 	# Get top model name
 	bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
