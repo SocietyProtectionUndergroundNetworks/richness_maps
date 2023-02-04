@@ -5,22 +5,21 @@ library(tidyverse)
 
 # Load data, rename biome names
 df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20221210_GFv4_richness_rarefied_sampled.csv") %>% 
-  mutate(Resolve_Biome = as.integer(Resolve_Biome)) 
-# %>% 
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 3, "Tropical Coniferous Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 4, "Temperate Broadleaf Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 5, "Temperate Conifer Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 6, "Boreal Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 7, "Tropical Grasslands")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 8, "Temperate Grasslands")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 9, "Flooded Grasslands")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 10, "Montane Grasslands")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 11, "Tundra")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 12, "Mediterranean Forests")) %>%
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 13, "Deserts")) %>% 
-  # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 14, "Mangroves")) 
+  mutate(Resolve_Biome = as.integer(Resolve_Biome)) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 3, "Tropical Coniferous Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 4, "Temperate Broadleaf Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 5, "Temperate Conifer Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 6, "Boreal Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 7, "Tropical Grasslands")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 8, "Temperate Grasslands")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 9, "Flooded Grasslands")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 10, "Montane Grasslands")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 11, "Tundra")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 12, "Mediterranean Forests")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 13, "Deserts")) %>%
+mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 14, "Mangroves"))
 
 metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/REL4_Colin_datasets_samples_metadata.csv')
 
@@ -36,6 +35,7 @@ summary_woBissetYan <- df %>%
   # summarise(mean = mean(myco_diversity), sd = sd(myco_diversity))
   summarise(n = n(), median = median(myco_diversity), iqr = IQR(myco_diversity)) %>% 
   mutate(cutoff = median + 5 * iqr)
+
 
 # Stats 
 dropped_stats <- df %>%

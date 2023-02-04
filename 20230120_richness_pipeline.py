@@ -5,17 +5,7 @@ import subprocess
 import time
 import datetime
 import ee
-# import multiprocessing
-# from scipy.spatial import ConvexHull
-# from sklearn.decomposition import PCA
-# from itertools import combinations
-# from itertools import repeat
 from pathlib import Path
-# from contextlib import contextmanager
-
-# service_account = 'crowther-gee@gem-eth-analysis.iam.gserviceaccount.com'
-# credentials = ee.ServiceAccountCredentials(service_account, '/Users/johanvandenhoogen/ETH/Projects/google_cloud/crowther-gee-serviceaccount/gem-eth-analysis-96ea9ecb2158.json')
-# ee.Initialize(credentials)
 ee.Initialize()
 
 setup = 'distictObs_wProjectVars'
@@ -434,12 +424,12 @@ else:
 ####################################################################################################################################################################
 # Import raw data
 # Outliers removed (performed in R using 20221213_data_filtering.R)
-rawPointCollection = pd.read_csv('data/20230120_GFv4_sampled_outliersRemoved.csv', float_precision='round_trip')
+rawPointCollection = pd.read_csv('data/20230203_GFv4_sampled_outliersRemoved.csv', float_precision='round_trip')
 rawPointCollection['source'] = 'GlobalFungi'
 print('Size of original Collection', rawPointCollection.shape[0])
 
 # Rename classification property column
-rawPointCollection.rename(columns={'myco_diversity': classProperty}, inplace=True)
+rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
 # Filter by guild
 rawPointCollection = rawPointCollection[rawPointCollection['guild'] == guild]
