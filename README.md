@@ -1,6 +1,12 @@
 # SPUN Fungal Richness maps
 This repository contains a versioned history of mycorrhizal richness predictions. 
 
+# February 4th 2023: Global Fungi Release 4, EM only
+<img style="float: right;" src="./output/ectomycorrhizal_richness_Predicted.png"/>
+
+
+
+
 ## Version 1: GlobalFungi
 - Date: 26 November 2021
 - Source data: https://globalfungi.com/
