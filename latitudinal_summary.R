@@ -16,8 +16,12 @@ df %>%
   geom_line(aes(color = Guild)) +
   coord_flip() +
   ylab("Richness") + xlab("Latitude") +
-  theme_classic()
-
+  theme_classic() +
+  facet_wrap(~ Guild) +
+  theme(
+    strip.background = element_blank(),
+    strip.text.x = element_blank()
+  )
 
 
 df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230207_ectomycorrhizal_latitude_summary.csv") %>% 
