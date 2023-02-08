@@ -683,98 +683,56 @@ try:
     predObs_wResiduals.size().getInfo()
 
 except Exception as e:
-    def predObsClassification(fcOI):
-        if ensemble == False:
-            # Load the best model from the classifier list
-            classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
-            classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', bestModelNameClassification).first()).get('c'))
+    for n in list(range(0,10)):
+        modelNameRegression = top_10ModelsRegression.get(n)
+        modelNameClassification = top_10ModelsClassification.get(n)
 
-            # Train the classifier with the collection
-            # REGRESSION
-            fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
-            trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+        # Load the best model from the classifier list
+        classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+        classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
 
-            # Classification
-            fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
-            trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+        # Train the classifier with the collection
+        # REGRESSION
+        fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
+        trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
-            # Classify the FC
-            classifiedFC_Regression = fcOI_validate.classify(trainedClassiferRegression,classProperty+'_Regressed')
-            classifiedFC_Classification = fcOI_validate.classify(trainedClassiferClassification,classProperty+'_Classified')
+        # Classification
+        fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+        trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
-            # Classify the FC
-            def classifyFunction(f):
-                classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
-                classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
+        # Classify the FC
+        def classifyFunction(f):
+            classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
+            classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
 
-                featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
+            featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
 
-                # Calculate final predicted value as product of classification and regression
-                featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
-                return featureToReturn
+            # Calculate final predicted value as product of classification and regression
+            featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
+            return featureToReturn
 
-            classifiedFC = fcOI.map(classifyFunction)
+        # Classify fcOI
+        predObs = fcOI.map(classifyFunction)
 
-        if ensemble == True:
-            def classifyFC(classifiers):
-                modelNameRegression = ee.List(classifiers).get(0)
-                modelNameClassification = ee.List(classifiers).get(1)
+        # Add coordinates to FC
+        predObs = predObs.map(addLatLon)
 
-                # Load the best model from the classifier list
-                classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
-                classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+        # back-log transform predicted and observed values
+        if log_transform_classProperty == True:
+            predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+            predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+            predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
 
-                # Train the classifier with the collection
-                # REGRESSION
-                fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
-                trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+        # Add residuals to FC
+        predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
 
-                # Classification
-                fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
-                trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
-
-                # Classify the FC
-                def classifyFunction(f):
-                    classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
-                    classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
-
-                    featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
-
-                    # Calculate final predicted value as product of classification and regression
-                    featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
-                    return featureToReturn
-
-                classifiedFC = fcOI.map(classifyFunction)
-
-                return classifiedFC
-
-            # Classify the FC
-            classifiedFC = ee.FeatureCollection(top_10ModelsRegression.zip(top_10ModelsClassification).map(classifyFC)).flatten()
-
-        return classifiedFC
-
-    # Classify FC
-    predObs = predObsClassification(fcOI)
-
-    # Add coordinates to FC
-    predObs = predObs.map(addLatLon)
-
-    # back-log transform predicted and observed values
-    if log_transform_classProperty == True:
-        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
-        predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
-
-    # Add residuals to FC
-    predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
-
-    # Export to Assets
-    predObsexport = ee.batch.Export.table.toAsset(
-        collection = predObs_wResiduals,
-        description = classProperty+'_pred_obs',
-        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
-    )
-    predObsexport.start()
+        # Export to Assets
+        predObsexport = ee.batch.Export.table.toAsset(
+            collection = predObs_wResiduals,
+            description = classProperty+'_pred_obs_rep_'+str(n),
+            assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)
+        )
+        predObsexport.start()
 
     # !! Break and wait
     count = 1
@@ -787,8 +745,13 @@ except Exception as e:
         time.sleep(normalWaitTime)
     print('Moving on...')
 
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+    predObsList = []
+    for n in list(range(0,10)):
+        predObs = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+        predObsList.append(predObs)
 
+    predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
+        
 # Convert to pd
 predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
@@ -905,7 +868,7 @@ classifiedImage = ee.Image.cat(regressedImage, classifiedImage, finalPredictedIm
 # Variable importance metrics
 ##################################################################################################################################################################
 if ensemble == False:
-    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierRegression).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
     # Train the classifier with the collection
     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
@@ -927,7 +890,7 @@ if ensemble == True:
 
     for i in list(range(0,10)):
         classifierName = top_10ModelsRegression.get(i)
-        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
         # Train the classifier with the collection
         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
@@ -1368,4 +1331,3 @@ for buffer in buffer_sizes:
     bloo_cv_fc_export.start()
 
 print('Blocked Leave-One-Out started! Moving on...')
-

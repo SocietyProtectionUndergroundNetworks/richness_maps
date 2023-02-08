@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 ee.Initialize()
 
+today = datetime.date.today().strftime("%Y%m%d")
+
 guild = 'arbuscular_mycorrhizal'
 ####################################################################################################################################################################
 # Configuration
@@ -397,7 +399,6 @@ else:
 # Data processing
 ####################################################################################################################################################################
 # Import raw data
-# Outliers removed (performed in R using 20230203_data_filtering.R)
 rawPointCollection = pd.read_csv('data/20230206_GFv4_AM_richness_rarefied_sampled.csv', float_precision='round_trip')
 print('Size of original Collection', rawPointCollection.shape[0])
 
@@ -511,32 +512,29 @@ for vps in varsPerSplit_list:
 # Make a feature collection from the k-fold assignment list
 kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
 
-finished_models_regression = list()
+finished_models = list()
 
 # Check if any models have been completed
 try:
-    grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
-    print(grid_search_resultsRegression.size().getInfo())
+    grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
+    print(grid_search_results.size().getInfo())
 
 except Exception as e:
     try:
         # Create list of finished models
-        finished_models_regression = subprocess.run(bashCommandList_ls+['users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'], stdout=subprocess.PIPE).stdout.splitlines()
-        finished_models_regression = [model.decode('ascii').split('/')[-1] for model in finished_models_regression]
+        finished_models = subprocess.run(bashCommandList_ls+['users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'], stdout=subprocess.PIPE).stdout.splitlines()
+        finished_models = [model.decode('ascii').split('/')[-1] for model in finished_models]
         
     except Exception as e:
-        classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
+        classDf = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
 
     # Perform model testing for remaining hyperparameter settings
     for rf in classifierList:
-        if rf.get('cName').getInfo() in finished_models_regression:
+        if rf.get('cName').getInfo() in finished_models:
             print('Model', classifierList.index(rf), 'out of total of', len(classifierList), 'already finished')
         else:
             print('Testing model', classifierList.index(rf), 'out of total of', len(classifierList))
-            #  train classifier only on data not equalling zero
-            # train classifier only on GlobalFungi data
-            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)\
-                    .filter(ee.Filter.neq(classProperty, 0))
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
             accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
             accuracy_featureExport = ee.batch.Export.table.toAsset(
                 collection = ee.FeatureCollection([accuracy_feature]),
@@ -556,31 +554,28 @@ except Exception as e:
     print('Moving on...')
 
 # Fetch FC from GEE
-grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierList]).flatten()
-classDfRegression = GEE_FC_to_pd(grid_search_resultsRegression)
+grid_search_results = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierList]).flatten()
+classDf = GEE_FC_to_pd(grid_search_results)
 
-grid_search_resultsRegression_export = ee.batch.Export.table.toAsset(
-    collection = grid_search_resultsRegression,
-    description = classProperty+'_Regression_grid_search_results',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
-grid_search_resultsRegression_export.start()
+grid_search_results_export = ee.batch.Export.table.toAsset(
+    collection = grid_search_results,
+    description = classProperty+'_grid_search_results',
+    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
+grid_search_results_export.start()
 
 # Sort values
-classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
+classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+classProperty+setup+'_grid_search_results_Regression_zeroInflated.csv', index=False)
+classDfSorted.to_csv('output/'+classProperty+'_grid_search_results.csv', index=False)
 
 # Get top model name
-bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
+bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
 
 # Get top 10 models
-top_10Models = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
+top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
 print('Moving on...')
-
-# Write grid search results to csv
-# GEE_FC_to_pd(grid_search_results.limit(10, 'Mean_R2', False)).to_csv('output/'+classProperty+'_grid_search_results.csv')
 
 ##################################################################################################################################################################
 # Predicted - Observed
@@ -592,13 +587,13 @@ try:
     predObs_wResiduals.size().getInfo()
 
 except Exception as e:
-    def predObsClassification(fcOI):
+    def predObs(fcOI):
         if ensemble == False:
             # Load the best model from the classifier list
             classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
             # Train the classifier with the collection
-            trainedClassifier = classifierRegression.train(fcOI, classProperty, covariateList)
+            trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
             
             # Classify the FC
             classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
@@ -624,7 +619,7 @@ except Exception as e:
             return classifiedFC
 
     # Classify FC
-    predObs = predObsClassification(fcOI)
+    predObs = predObs(fcOI)
 
     # Add coordinates to FC
     predObs = predObs.map(addLatLon)
@@ -662,10 +657,9 @@ except Exception as e:
 predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
 # Group by sample ID to return mean across ensemble prediction
-if pixel_agg == False:
-    predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/20230206_'+classProperty+'_pred_obs.csv')
+predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
 #################################################################################################################################################################
 # Classify image
@@ -696,28 +690,28 @@ constant_imgs = ee.ImageCollection.fromImages([target_marker, sequencing_platfor
 def finalImageClassification(compositeImg):
     if ensemble == False:
         # Load the best model from the classifier list
-        classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
         # Train the classifier with the collection
-        trainedClassiferRegression = classifierRegression.train(fcOI, classProperty, covariateList)
+        trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
         # Classify the FC
-        classifiedImage_Regression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Predicted')
+        classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
 
-        return classifiedImage_Regression
+        return classifiedImage
 
     if ensemble == True:
-        def classifyImage(modelNameRegression):
+        def classifyImage(modelName):
             # Load the best model from the classifier list
-            classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', modelName).first()).get('c'))
 
             # Train the classifier with the collection
-            trainedClassiferRegression = classifierRegression.train(fcOI, classProperty, covariateList)
+            trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
             # Classify the FC
-            classifiedImage_Regression = compositeImg.classify(trainedClassiferRegression,classProperty+'_Predicted')
+            classifiedImage = compositeImg.classify(trainedClassifer,classProperty+'_Predicted')
 
-            return classifiedImage_Regression
+            return classifiedImage
 
         # Classify the images, return mean
         classifiedImage = ee.ImageCollection(top_10Models.map(classifyImage)).mean()
@@ -734,7 +728,7 @@ if log_transform_classProperty == True:
 # Variable importance metrics
 ##################################################################################################################################################################
 if ensemble == False:
-    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierRegression).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
     # Train the classifier with the collection
     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
@@ -756,7 +750,7 @@ if ensemble == True:
 
     for i in list(range(0,10)):
         classifierName = top_10Models.get(i)
-        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
         # Train the classifier with the collection
         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
@@ -839,8 +833,7 @@ while count >= 1:
 print('Moving on...')
 
 # Load the best model from the classifier list
-classifierToBootstrapRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelNameRegression).first()).get('c'))
-classifierToBootstrapClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName','equals',bestModelNameClassification).first()).get('c'))
+classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
 
 # Create empty list to store all fcs
 fcList = []
@@ -858,18 +851,10 @@ for n in seedsToUseForBootstrapping:
 # Helper fucntion to train a RF classifier and classify the composite image
 def bootstrapFunc(fc):
     # Train the classifier with the collection
-    fcOI_forRegression = fc.filter(ee.Filter.neq(classProperty, 0)) #  train classifier only on data not equalling zero
-    trainedClassiferRegression = classifierToBootstrapRegression.train(fcOI_forRegression, classProperty, covariateList)
-
-    # Classification
-    fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
-    trainedClassiferClassification = classifierToBootstrapClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+    trainedClassifer = classifierToBootstrap.train(fc, classProperty, covariateList)
 
     # Classify the image
-    classifiedImageRegression = compositeToClassify.classify(trainedClassiferRegression,classProperty+'_Regressed')
-    classifiedImageClassification = compositeToClassify.classify(trainedClassiferClassification,classProperty+'_Classified')
-
-    classifiedImage = classifiedImageRegression.multiply(classifiedImageClassification).rename(classProperty+'_Predicted')
+    classifiedImage = compositeToClassify.classify(trainedClassifer,classProperty+'_Predicted')
 
     return classifiedImage
 
@@ -1100,13 +1085,13 @@ for buffer in buffer_sizes:
     # Make a feature collection from the buffer sizes list
     fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
 
-    grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results_Regression')
+    grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
 
     # Get top model name
-    bestModelName = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('modelName')
+    bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('modelName')
 
     # Get top 10 models
-    top_10Models = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('modelName')
+    top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('modelName')
 
     # Helper function 1: assess whether point is within sampled range
     def WithinRange(f):
@@ -1140,8 +1125,8 @@ for buffer in buffer_sizes:
         trainFC = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.geometry(testFeature).Not())
 
         # Classifier to test: same hyperparameter settings as from grid search procedure
-        classifierName = top_10ModelsRegression.get(rep)
-        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+        classifierName = top_10Models.get(rep)
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
         # Train classifier
         trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
