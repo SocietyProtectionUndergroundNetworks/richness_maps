@@ -5,7 +5,13 @@ import subprocess
 import time
 import datetime
 import ee
+import matplotlib.pyplot as plt
 from pathlib import Path
+from scipy.spatial import ConvexHull
+from sklearn.decomposition import PCA
+from itertools import combinations
+from itertools import repeat
+
 ee.Initialize()
 
 guild = 'ectomycorrhizal'
@@ -119,7 +125,7 @@ k = 10
 kList = list(range(1,k+1))
 
 # Set number of trees in RF models
-nTrees = 500
+nTrees = 250
 
 # Input the name of the property that holds the CV fold assignment
 cvFoldString = 'CV_Fold'
@@ -157,11 +163,8 @@ bootstrapIterations = 100
 # Generate the seeds for bootstrapping
 seedsToUseForBootstrapping = list(range(1, bootstrapIterations+1))
 
-# Input the name of a folder used to hold the bootstrap collections
-bootstrapCollFolder = 'Bootstrap_Collections'
-
-# Input the header text that will name each bootstrapped dataset
-fileNameHeader = classProperty+'BootstrapColl_'
+# Input the header text that will name the bootstrapped dataset
+bootstrapSamples = classProperty+'_bootstrapSamples'
 
 # Write the name of the variable used for stratification
 stratificationVariableString = "Resolve_Biome"
@@ -1238,10 +1241,10 @@ for buffer in buffer_sizes:
     grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results_Regression')
 
     # Get top model name
-    bestModelName = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('modelName')
+    bestModelName = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
 
     # Get top 10 models
-    top_10Models = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('modelName')
+    top_10Models = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
     # Helper function 1: assess whether point is within sampled range
     def WithinRange(f):

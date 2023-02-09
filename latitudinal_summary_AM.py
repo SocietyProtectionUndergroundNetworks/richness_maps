@@ -15,7 +15,7 @@ imageOfInterest = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_6/arbuscular_m
 
 scale = imageOfInterest.projection().nominalScale().getInfo()
 
-latitude_list = ee.List.sequence(-60,80,1).getInfo()
+latitude_list = ee.List.sequence(-60,80,0.1).getInfo()
 latitude_list = [int(el*10)/10 for el in latitude_list]
 
 unboundedGeo = ee.Geometry.Polygon([[[-180, 88], [180, 88], [180, -88], [-180, -88]]], None, False)
@@ -32,7 +32,7 @@ imageOfInterest = imageOfInterest.unitScale(ee.Number(minMaxDict.get('arbuscular
 
 def get_lat_summary(n):
     latitude = latitude_list[n]
-    mask = ee.Image.pixelLonLat().select('latitude').lt(latitude + 2).updateMask(ee.Image.pixelLonLat().select('latitude').gte(latitude)).selfMask()
+    mask = ee.Image.pixelLonLat().select('latitude').lt(latitude + 0.1).updateMask(ee.Image.pixelLonLat().select('latitude').gte(latitude)).selfMask()
     maskedImg = imageOfInterest.updateMask(mask)
 
     # Workaround for combined reducer: duplicate bands

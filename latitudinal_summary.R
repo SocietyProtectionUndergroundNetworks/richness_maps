@@ -1,27 +1,33 @@
+library(slider)
 library(data.table)
 library(tidyverse)
 
 setwd('/Users/johanvandenhoogen/SPUN/richness_maps')
 
-df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230207_ectomycorrhizal_latitude_summary.csv") %>% 
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230208_ectomycorrhizal_latitude_summary.csv") %>% 
   mutate(Guild = 'Ectomycorrhizal') %>% 
-  rbind(fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230207_arbuscular_mycorrhizal_latitude_summary.csv") %>% 
+  rbind(fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230208_arbuscular_mycorrhizal_latitude_summary.csv") %>% 
           mutate(Guild = 'Arbuscular Mycorrhizal'))
 
-
 df %>% 
-  na.omit() %>% 
+  mutate(lower = slide_dbl(df$lower, ~mean(.x), .before = 10, .after = 10)) %>%
+  mutate(mean = slide_dbl(df$mean, ~mean(.x), .before = 10, .after = 10)) %>%
+  mutate(upper = slide_dbl(df$upper, ~mean(.x), .before = 10, .after = 10)) %>%
+  na.omit() %>%
   ggplot(aes(x = latitude, y = mean)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper, fill = Guild), alpha = 0.2) +
-  geom_line(aes(color = Guild)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper, fill = Guild), alpha = 0.15) +
+  geom_line(aes(color = Guild), alpha = 0.7, lwd = 1) +
   coord_flip() +
-  ylab("Richness") + xlab("Latitude") +
+  ylab("Richness (scaled)") + xlab("Latitude") +
   theme_classic() +
-  facet_wrap(~ Guild) +
+  # facet_wrap(~ Guild) +
   theme(
     strip.background = element_blank(),
     strip.text.x = element_blank()
-  )
+  ) 
+
+
+
 
 
 df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/output/20230207_ectomycorrhizal_latitude_summary.csv") %>% 
@@ -39,7 +45,7 @@ df %>%
   geom_ribbon(aes(ymin = lower, ymax = upper, fill = Group), alpha = 0.2) +
   geom_line(aes(color = Group)) +
   coord_flip() +
-  ylab("Richness") + xlab("Latitude") +
+  ylab("Richness (scaled)") + xlab("Latitude") +
   theme_classic() +
   scale_fill_manual(values = c("Arbuscular Mycorrhizal Fungi" = "#F8766D", "Ectomycorrhizal Fungi" = "#619CFF", "Plants" = "#00BA38", "Mammals" = "#b06323")) +
   scale_color_manual(values = c("Arbuscular Mycorrhizal Fungi" = "#F8766D", "Ectomycorrhizal Fungi" = "#619CFF", "Plants" = "#00BA38", "Mammals" = "#b06323"))

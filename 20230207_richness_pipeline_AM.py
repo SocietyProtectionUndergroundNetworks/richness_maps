@@ -5,9 +5,12 @@ import subprocess
 import time
 import datetime
 import ee
-from pathlib import Path
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
+from pathlib import Path
+from scipy.spatial import ConvexHull
+from sklearn.decomposition import PCA
+from itertools import combinations
+from itertools import repeat
 ee.Initialize()
 
 today = datetime.date.today().strftime("%Y%m%d")
@@ -156,11 +159,8 @@ bootstrapIterations = 100
 # Generate the seeds for bootstrapping
 seedsToUseForBootstrapping = list(range(1, bootstrapIterations+1))
 
-# Input the name of a folder used to hold the bootstrap collections
-bootstrapCollFolder = 'Bootstrap_Collections'
-
-# Input the header text that will name each bootstrapped dataset
-fileNameHeader = classProperty+'BootstrapColl_'
+# Input the header text that will name the bootstrapped dataset
+bootstrapSamples = classProperty+'_bootstrapSamples'
 
 # Write the name of the variable used for stratification
 stratificationVariableString = "Resolve_Biome"
@@ -411,6 +411,27 @@ rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection
 rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
 rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_gene']).astype('category').cat.codes)
 
+# Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
+fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+
+# Remove duplicates
+preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
+print('Number of aggregated pixels', preppedCollection.shape[0])
+
+# Drop NAs
+preppedCollection = preppedCollection.dropna(how='any')
+print('After dropping NAs', preppedCollection.shape[0])
+
+# Log transform classProperty; if specified
+if log_transform_classProperty == True:
+    preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
+
+# Convert biome column to int, to correct odd rounding errors
+preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
+
+# Add fold assignments to each of the points, stratified by biome
+preppedCollection[cvFoldString] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
+
 try:
     # try whether fcOI is present
     fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -419,27 +440,6 @@ try:
     print(guild, fcOI.size().getInfo())
 
 except Exception as e:
-
-    # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
-
-    # Remove duplicates
-    preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-    print('Number of aggregated pixels', preppedCollection.shape[0])
-
-    # Drop NAs
-    preppedCollection = preppedCollection.dropna(how='any')
-    print('After dropping NAs', preppedCollection.shape[0])
-
-    # Log transform classProperty; if specified
-    if log_transform_classProperty == True:
-        preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
-
-    # Convert biome column to int, to correct odd rounding errors
-    preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
-
-    # Add fold assignments to each of the points, stratified by biome
-    preppedCollection[cvFoldString] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
 
     # Write the CSV to disk and upload it to Earth Engine as a Feature Collection
     localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
@@ -1086,12 +1086,12 @@ for buffer in buffer_sizes:
     fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
 
     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
-
+  
     # Get top model name
-    bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('modelName')
+    bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
 
     # Get top 10 models
-    top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('modelName')
+    top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
     # Helper function 1: assess whether point is within sampled range
     def WithinRange(f):
@@ -1147,7 +1147,7 @@ for buffer in buffer_sizes:
         buffer_size = f.get('buffer_size')
 
         # Sample 1000 validation points from the data
-        fc_withRandom = fcOI.filter(ee.Filter.neq(classProperty, 0)).randomColumn(seed = rep)
+        fc_withRandom = fcOI.randomColumn(seed = rep)
         subsetData = fc_withRandom.sort('random').limit(n_points)
 
         # Add the iteration ID to the FC
