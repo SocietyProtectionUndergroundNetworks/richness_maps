@@ -817,7 +817,7 @@ stratSample.to_csv(holdingFolder+'/'+bootstrapSamples+'.csv',index=False)
 
 # Format the bash call to upload the files to the Google Cloud Storage bucket
 gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
-subprocess.run(gsutilBashUploadList)
+# subprocess.run(gsutilBashUploadList)
 print(bootstrapSamples+' uploaded to a GCSB!')
 
 # Wait for the GSUTIL uploading process to finish before moving on
@@ -1050,7 +1050,7 @@ FinalImageExport = ee.batch.Export.image.toAsset(
     maxPixels = int(1e13),
     pyramidingPolicy = {".default": pyramidingPolicy}
 )
-FinalImageExport.start()
+# FinalImageExport.start()
 
 print('Map exports started! Moving on...')
 
@@ -1192,6 +1192,6 @@ for buffer in buffer_sizes:
         assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/sloo_cv/'+classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer)
     )
 
-    # bloo_cv_fc_export.start()
+    bloo_cv_fc_export.start()
 
 print('Blocked Leave-One-Out started! Moving on...')

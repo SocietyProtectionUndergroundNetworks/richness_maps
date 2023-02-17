@@ -96,7 +96,6 @@ df %>%
   xlab("Regular approach") + ylab("With spatial predictors") +
   annotate("text", x = 80, y = 100, label= paste0("R2 = ", R2val))
 
-
 # Random points sampled from maps
 df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230214_random_pionts_sampled_AM.csv') %>% 
   mutate(arbuscular_mycorrhizal_richness_predicted = scales::rescale(arbuscular_mycorrhizal_richness_predicted, to = c(0, 1))) %>% 

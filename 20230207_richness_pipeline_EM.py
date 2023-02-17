@@ -446,6 +446,27 @@ rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection
 rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
 rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_gene']).astype('category').cat.codes)
 
+# Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
+fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+
+# Remove duplicates
+preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
+print('Number of aggregated pixels', preppedCollection.shape[0])
+
+# Drop NAs
+preppedCollection = preppedCollection.dropna(how='any')
+print('After dropping NAs', preppedCollection.shape[0])
+
+# Log transform classProperty; if specified
+if log_transform_classProperty == True:
+    preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
+
+# Convert biome column to int, to correct odd rounding errors
+preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
+
+# Add fold assignments to each of the points, stratified by biome
+preppedCollection[cvFoldString] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
+
 try:
     # try whether fcOI is present
     fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -454,28 +475,6 @@ try:
     print(guild, fcOI.size().getInfo())
 
 except Exception as e:
-
-    # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
-
-    # Remove duplicates
-    preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-    print('Number of aggregated pixels', preppedCollection.shape[0])
-
-    # Drop NAs
-    preppedCollection = preppedCollection.dropna(how='any')
-    print('After dropping NAs', preppedCollection.shape[0])
-
-    # Log transform classProperty; if specified
-    if log_transform_classProperty == True:
-        preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
-
-    # Convert biome column to int, to correct odd rounding errors
-    preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
-
-    # Add fold assignments to each of the points, stratified by biome
-    preppedCollection[cvFoldString] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
-
     # Write the CSV to disk and upload it to Earth Engine as a Feature Collection
     localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
     preppedCollection.to_csv(localPathToCVAssignedData,index=False)
@@ -680,7 +679,7 @@ print('Moving on...')
 # Predicted - Observed
 ##################################################################################################################################################################
 fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
-
+'''
 try:
     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
     predObs_wResiduals.size().getInfo()
@@ -764,7 +763,7 @@ predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
 print('Predicted Observed done, moving on...')
-
+'''
 #################################################################################################################################################################
 # Classify image
 #################################################################################################################################################################
@@ -867,61 +866,61 @@ finalPredictedImage = regressedImage.multiply(classifiedImage).rename(classPrope
 
 classifiedImage = ee.Image.cat(regressedImage, classifiedImage, finalPredictedImage)
 
-##################################################################################################################################################################
-# Variable importance metrics
-##################################################################################################################################################################
-if ensemble == False:
-    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+# ##################################################################################################################################################################
+# # Variable importance metrics
+# ##################################################################################################################################################################
+# if ensemble == False:
+#     classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-    # Train the classifier with the collection
-    trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+#     # Train the classifier with the collection
+#     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-    # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-    featureImportances = trainedClassifer.explain().get('importance').getInfo()
+#     # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+#     featureImportances = trainedClassifer.explain().get('importance').getInfo()
 
-    featureImportances = pd.DataFrame(featureImportances.items(),
-                                        columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-                                                                                                ascending=False)
+#     featureImportances = pd.DataFrame(featureImportances.items(),
+#                                         columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+#                                                                                                 ascending=False)
 
-    # Scale values
-    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
-    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
+#     # Scale values
+#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
+#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
 
-if ensemble == True:
-    # Instantiate empty dataframe
-    featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
+# if ensemble == True:
+#     # Instantiate empty dataframe
+#     featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
 
-    for i in list(range(0,10)):
-        classifierName = top_10ModelsRegression.get(i)
-        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+#     for i in list(range(0,10)):
+#         classifierName = top_10ModelsRegression.get(i)
+#         classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-        # Train the classifier with the collection
-        trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+#         # Train the classifier with the collection
+#         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-        # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-        featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
-        featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
-                                            columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-                                                                                                    ascending=False)
-        # Scale values
-        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
-        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
+#         # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+#         featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
+#         featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
+#                                             columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+#                                                                                                     ascending=False)
+#         # Scale values
+#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
+#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
 
-        featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
+#         featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
 
-    featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
+#     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
-# Write to csv
-featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
-featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+# # Write to csv
+# featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
+# featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
 
-# Create and save plot
-plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
-                                title='Feature Importances')
-fig = plt.get_figure()
-fig.savefig('output/'+today+'_'+classProperty+'_featureImportances.png', bbox_inches='tight')
+# # Create and save plot
+# plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
+#                                 title='Feature Importances')
+# fig = plt.get_figure()
+# fig.savefig('output/'+today+'_'+classProperty+'_featureImportances.png', bbox_inches='tight')
 
-print('Variable importance metrics complete! Moving on...')
+# print('Variable importance metrics complete! Moving on...')
 
 ##################################################################################################################################################################
 # Bootstrapping
