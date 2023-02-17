@@ -143,7 +143,7 @@ def get_prebObs(iteration):
     predObs = classifiedFC.map(addLatLon)
 
     # Add residuals to FC
-    predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
+    predObs_wResiduals = predObs.map(lambda f: f.set('residuals', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
 
     # Convert to pd
     predObs_df = GEE_FC_to_pd(predObs_wResiduals)
