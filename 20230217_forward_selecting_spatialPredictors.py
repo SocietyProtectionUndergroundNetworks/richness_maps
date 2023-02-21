@@ -13,64 +13,75 @@ today = datetime.date.today().strftime("%Y%m%d")
 guild = 'arbuscular_mycorrhizal'
 
 
-####################################################################################################################################################################
-# Helper functions
-####################################################################################################################################################################
-# Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
-def GEE_FC_to_pd(fc):
-    result = []
+setupList = [
+    'wSpatial_wProject',
+    'wSpatial_woProject'
+]
+from itertools import repeat
+mapList = []
+for setup in setupList:
+    for el in list(range(0,21)):
+        mapList = mapList + (list(zip([setup], repeat(el))))
 
-    values = fc.toList(500000).getInfo()
+def get_prebObs(tup):
+    setup, iteration = tup
+    ####################################################################################################################################################################
+    # Helper functions
+    ####################################################################################################################################################################
+    # Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
+    def GEE_FC_to_pd(fc):
+        result = []
 
-    BANDS = fc.first().propertyNames().getInfo()
+        values = fc.toList(500000).getInfo()
 
-    if 'system:index' in BANDS: BANDS.remove('system:index')
+        BANDS = fc.first().propertyNames().getInfo()
 
-    for item in values:
-        values_item = item['properties']
-        row = [values_item[key] for key in BANDS]
-        result.append(row)
+        if 'system:index' in BANDS: BANDS.remove('system:index')
 
-    df = pd.DataFrame([item for item in result], columns = BANDS)
-    df.replace('None', np.nan, inplace = True)
+        for item in values:
+            values_item = item['properties']
+            row = [values_item[key] for key in BANDS]
+            result.append(row)
 
-    return df
+        df = pd.DataFrame([item for item in result], columns = BANDS)
+        df.replace('None', np.nan, inplace = True)
 
-# Add point coordinates to FC as properties
-def addLatLon(f):
-    lat = f.geometry().coordinates().get(1)
-    lon = f.geometry().coordinates().get(0)
-    return f.set(latString, lat).set(longString, lon)
+        return df
+
+    # Add point coordinates to FC as properties
+    def addLatLon(f):
+        lat = f.geometry().coordinates().get(1)
+        lon = f.geometry().coordinates().get(0)
+        return f.set(latString, lat).set(longString, lon)
+
+    ####################################################################################################################################################################
+    # Configuration
+    ####################################################################################################################################################################
+    # Input the name of the username that serves as the home folder for asset storage
+    usernameFolderString = 'johanvandenhoogen'
+
+    # Input the Cloud Storage Bucket that will hold the bootstrap collections when uploading them to Earth Engine
+    # !! This bucket should be pre-created before running this script
+    bucketOfInterest = 'johanvandenhoogen'
+
+    # Input the name of the classification property
+    classProperty = guild + '_richness'
+
+    # Input the name of the project folder inside which all of the assets will be stored
+    # This folder will be generated automatically below, if it isn't yet present
+    projectFolder = '000_SPUN_GFv4_8/' + guild + '_wSpatialPreds'
+
+    # Input the normal wait time (in seconds) for "wait and break" cells
+    normalWaitTime = 5
+
+    # Input a longer wait time (in seconds) for "wait and break" cells
+    longWaitTime = 10
+
+    # Specify the column names where the latitude and longitude information is stored
+    latString = 'Pixel_Lat'
+    longString = 'Pixel_Long'
 
 
-####################################################################################################################################################################
-# Configuration
-####################################################################################################################################################################
-# Input the name of the username that serves as the home folder for asset storage
-usernameFolderString = 'johanvandenhoogen'
-
-# Input the Cloud Storage Bucket that will hold the bootstrap collections when uploading them to Earth Engine
-# !! This bucket should be pre-created before running this script
-bucketOfInterest = 'johanvandenhoogen'
-
-# Input the name of the classification property
-classProperty = guild + '_richness'
-
-# Input the name of the project folder inside which all of the assets will be stored
-# This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_8/' + guild + '_wSpatialPreds'
-
-# Input the normal wait time (in seconds) for "wait and break" cells
-normalWaitTime = 5
-
-# Input a longer wait time (in seconds) for "wait and break" cells
-longWaitTime = 10
-
-# Specify the column names where the latitude and longitude information is stored
-latString = 'Pixel_Lat'
-longString = 'Pixel_Long'
-
-def get_prebObs(iteration):
     # List of the covariates to use
     covariateList = [
     'CGIAR_PET',
@@ -117,8 +128,11 @@ def get_prebObs(iteration):
     ]
 
     spatial_preds = ['MEM1', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM4', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM6', 'MEM7', 'MEM8', 'MEM81', 'MEM9']
-
-    covariateList = covariateList + project_vars + spatial_preds[0:iteration]
+    
+    if setup == 'wSpatial_wProject':
+        covariateList = covariateList + project_vars + spatial_preds[0:iteration]
+    if setup == 'wSpatial_woProject':
+        covariateList = covariateList + spatial_preds[0:iteration]
 
     ##################################################################################################################################################################
     # Predicted - Observed
@@ -127,14 +141,19 @@ def get_prebObs(iteration):
 
     classifier = ee.Classifier.smileRandomForest(
             numberOfTrees = 250,
-            # variablesPerSplit = vps,
-            # minLeafPopulation = lp,
+            variablesPerSplit = 4,
+            minLeafPopulation = 4,
             bagFraction = 0.632,
             seed = 42
             ).setOutputMode('REGRESSION')
 
     # Train the classifier with the collection
     trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+
+    if setup == 'wSpatial_wProject':
+        fcOI = fcOI.map(lambda f: f.set('sequencing_platform', 1))
+        fcOI = fcOI.map(lambda f: f.set('sample_type', 0))
+        fcOI = fcOI.map(lambda f: f.set('primers', 4))
 
     # Classify the FC
     classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
@@ -143,14 +162,15 @@ def get_prebObs(iteration):
     predObs = classifiedFC.map(addLatLon)
 
     # Add residuals to FC
-    predObs_wResiduals = predObs.map(lambda f: f.set('residuals', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+    predObs_wResiduals = predObs.map(lambda f: f.set('residuals', ee.Number(f.get(classProperty)).subtract(f.get(classProperty+'_Predicted'))))
 
     # Convert to pd
     predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
     # Group by sample ID to return mean across ensemble prediction
-    predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+    # predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
     predObs_df['number_of_spatialpredictors'] = iteration
+    predObs_df['setup'] = setup
     return predObs_df
     # predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs_w_'+iteration+'_spatialPreds.csv')
 
@@ -169,8 +189,9 @@ if __name__ == '__main__':
 		# number smaller.  You should be able to always use at least 20.
 		NPROC = 20
 		with poolcontext(NPROC) as pool:
-				results = pool.map(
-						partial(get_prebObs),
-						list(range(0,21)))
+				results = pool.map(get_prebObs, mapList)
+						# partial(get_prebObs, setup = setupList),
+						# list(range(0,21)))
 				results = pd.concat(results)
 				results.to_csv('data/'+today+'_predObs_forwardselected_spatialpredictors.csv')
+
