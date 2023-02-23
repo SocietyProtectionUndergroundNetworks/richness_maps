@@ -108,7 +108,7 @@ project_vars = [
 'primers'
 ]
 
-covariateList = covariateList + project_vars
+covariateList = covariateList #+ project_vars
 
 ####################################################################################################################################################################
 # Cross validation settings

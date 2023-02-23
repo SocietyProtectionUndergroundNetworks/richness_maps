@@ -81,7 +81,6 @@ def get_prebObs(tup):
     latString = 'Pixel_Lat'
     longString = 'Pixel_Long'
 
-
     # List of the covariates to use
     covariateList = [
     'CGIAR_PET',
@@ -100,8 +99,8 @@ def get_prebObs(tup):
     'EarthEnvTexture_CoOfVar_EVI',
     'EarthEnvTexture_Correlation_EVI',
     'EarthEnvTexture_Homogeneity_EVI',
-    # 'EarthEnvTopoMed_AspectCosine',
-    # 'EarthEnvTopoMedAspectSine',
+    'EarthEnvTopoMed_AspectCosine',
+    'EarthEnvTopoMed_AspectSine',
     'EarthEnvTopoMed_Elevation',
     'EarthEnvTopoMed_Slope',
     'EarthEnvTopoMed_TopoPositionIndex',
@@ -141,8 +140,8 @@ def get_prebObs(tup):
 
     classifier = ee.Classifier.smileRandomForest(
             numberOfTrees = 250,
-            variablesPerSplit = 4,
-            minLeafPopulation = 4,
+            variablesPerSplit = 6,
+            minLeafPopulation = 3,
             bagFraction = 0.632,
             seed = 42
             ).setOutputMode('REGRESSION')

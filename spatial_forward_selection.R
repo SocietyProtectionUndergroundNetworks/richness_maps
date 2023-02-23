@@ -1,3 +1,7 @@
+library(data.table)
+library(spatialRF)
+library(patchwork)
+
 list <- list()
 df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230221_predObs_forwardselected_spatialpredictors.csv') %>% 
   filter(number_of_spatialpredictors == 0) %>% 
@@ -43,7 +47,7 @@ for (se in c('wSpatial_wProject', 'wSpatial_woProject')){
       breaks = c("p < 0.05", "p >= 0.05"),
       values = c("red", "black")
     ) +
-    facet_wrap(vars(number_of_spatialpredictors)) +
+    facet_wrap(vars(number_of_spatialpredictors), nrow = 7) +
     # ylim(c(-0.05, 0.1)) +
     geom_hline(yintercept = 0, linetype = 'dashed') +
     theme_bw() +
@@ -54,8 +58,98 @@ for (se in c('wSpatial_wProject', 'wSpatial_woProject')){
     ggtitle(paste(se))
 }
 
-library(patchwork)
 p$wSpatial_wProject + theme(legend.position = 'none') + p$wSpatial_woProject + ylab("")
+
+
+
+
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230221_AM_predObs_sampled.csv') %>% 
+  mutate(residuals = arbuscular_mycorrhizal_richness - arbuscular_mycorrhizal_richness_predicted_regular) %>% 
+  na.omit()
+xy <- df[, c("longitude", "latitude")]
+distance.matrix = distm(xy)/1000
+
+out <- spatialRF::moran_multithreshold(
+  x = df$residuals,
+  distance.matrix = distance.matrix,
+  distance.threshold = distance.thresholds,
+  verbose = F
+)
+
+p3 <- out$per.distance %>%
+  mutate(p.value.binary = case_when(p.value >= 0.05 ~ "p >= 0.05",
+                                    p.value < 0.05 ~ "p < 0.05")) %>% 
+  ggplot(aes(x = distance.threshold, y = moran.i)) +
+  geom_line() +
+  geom_point(aes(color = p.value.binary)) +
+  scale_color_manual(
+    breaks = c("p < 0.05", "p >= 0.05"),
+    values = c("red", "black")
+  ) +
+  # ylim(c(-0.05, 0.1)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  theme_bw() +
+  xlab('Distance (km)') +
+  ylab("Moran's I") +
+  theme(legend.title=element_blank()) +
+  # ggtitle('Number of Spatial Predictors') +
+  ggtitle('sampled from map')
+
+
+p$wSpatial_wProject + theme(legend.position = 'none') + p$wSpatial_woProject + ylab("") + p3
+
+
+
+
+
+
+
+p4 <- out$per.distance %>%
+  mutate(p.value.binary = case_when(p.value >= 0.05 ~ "p >= 0.05",
+                                    p.value < 0.05 ~ "p < 0.05")) %>% 
+  ggplot(aes(x = distance.threshold, y = moran.i)) +
+  geom_line() +
+  geom_point(aes(color = p.value.binary)) +
+  scale_color_manual(
+    breaks = c("p < 0.05", "p >= 0.05"),
+    values = c("red", "black")
+  ) +
+  # ylim(c(-0.05, 0.1)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  theme_bw() +
+  xlab('Distance (km)') +
+  ylab("Moran's I") +
+  theme(legend.title=element_blank()) +
+  ggtitle('Number of Spatial Predictors = 0')
+
+
+p3+p4
+
+
+
+fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230221_predObs_forwardselected_spatialpredictors.csv') %>% 
+  # filter(number_of_spatialpredictors == 0) %>% 
+  ggplot(aes(x = arbuscular_mycorrhizal_richness, y = arbuscular_mycorrhizal_richness_Predicted)) +
+  geom_point() +
+  geom_abline() +
+  facet_wrap(vars(setup, number_of_spatialpredictors))
+
+
+
+
+
+d
+
+
+
+
+
+
+
+
+
+
+
 
 
 # env = c(
