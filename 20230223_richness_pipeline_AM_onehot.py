@@ -466,10 +466,9 @@ fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_ind
 
 # Remove duplicates / pixel aggregate
 preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-# preppedCollection = pd.DataFrame(fcToAggregate.groupby(['Pixel_Lat', 'Pixel_Long']).mean().to_records())[covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']+['source']]
 
 print('Number of aggregated pixels', preppedCollection.shape[0])
-preppedCollection.isna().sum()
+
 # Drop NAs
 preppedCollection = preppedCollection.dropna(how='any')
 print('After dropping NAs', preppedCollection.shape[0])
@@ -481,15 +480,14 @@ if log_transform_classProperty == True:
 # Convert biome column to int, to correct odd rounding errors
 preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
 
-# Generate folds
-# Add fold assignments to each of the points, stratified by biome
+# Generate random folds, stratified by biome
 preppedCollection[cvFoldHeader+'_Random'] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
 
 # Write the CSV to disk and upload it to Earth Engine as a Feature Collection
 localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
 preppedCollection.to_csv(localPathToCVAssignedData,index=False)
 
-# Run R script to generate spatial folds. Folds are added to the csv file
+# Generate spatial folds. Folds are added to the csv file
 R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/generateFoldsForCV.R " + \
           "--k 10 " + \
           "--type Hexagon " +  \
@@ -499,6 +497,7 @@ R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/gener
           "--lat Pixel_Lat " + \
           "--path " + localPathToCVAssignedData]
 
+# Run the R script
 subprocess.run(R_call, shell = True) 
 
 # Determine block size for spatial folds
@@ -511,8 +510,9 @@ preppedCollection_wSpatialFolds = pd.read_csv(localPathToCVAssignedData)
 preppedCollection_wSpatialFolds[cvFoldHeader+'_Spatial'] = preppedCollection_wSpatialFolds['foldID_' + blockCVsize]
 preppedCollection_wSpatialFolds = preppedCollection_wSpatialFolds.drop(columns = [x for x in preppedCollection_wSpatialFolds.columns if 'foldID_' in x])
 
-# Write the CSV to disk and upload it to Earth Engine as a Feature Collection
+# Write the CSV to disk 
 preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
+
 try:
     # try whether fcOI is present
     fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -925,8 +925,8 @@ if ensemble == True:
     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
 # Write to csv
-featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
 featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
 
 # Create and save plot
 plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,

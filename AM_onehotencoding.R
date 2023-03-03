@@ -32,4 +32,4 @@ df_final <- df_onehot %>% left_join(., fread('/Users/johanvandenhoogen/SPUN/rich
                                       select(-all_of(projectVars)), by = 'sample_id')
 
 # Write to file
-fwrite(df_onehot, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv')
+fwrite(df_final, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv')

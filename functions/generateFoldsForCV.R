@@ -37,8 +37,8 @@ main <- function(k, type, inputPath, lonString, latString, crs, seed) {
   if(length(seed) == 0){seed = 1}
   
   # print(commandArgs())
-  
-  print(paste0('Generating ',k,' folds using ',type,' shapes in the ',crs,' projection.'))
+  if(type == 'H3'){print(paste0('Generating ',k,' folds using ',type,' shapes'))}
+  if(type %in% c('Rectangle', 'Hexagon')){print(paste0('Generating ',k,' folds using ',type,' shapes in the ',crs,' projection.'))}  
   generateFolds(k, type, inputPath, lonString, latString, crs, seed)
 }
 
@@ -48,12 +48,12 @@ generateFolds <- function(k,
                           inputPath,
                           lonString,
                           latString,
-                          crs='EPSG:4326',
+                          crs,
                           seed) {
   
   # Load the data and transform into spatial features 
   sampleLocations <- fread(inputPath)
-  sampleLocations_sf <- st_as_sf(sampleLocations, coords=c(lonString, latString), crs='EPSG:4326')
+  sampleLocations_sf <- st_as_sf(sampleLocations, coords=c(lonString, latString), crs=crs)
   
   ### Uber H3 
   # Hexagons with roughly equally sized area
