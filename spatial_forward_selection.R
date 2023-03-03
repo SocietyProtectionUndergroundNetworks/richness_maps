@@ -137,11 +137,31 @@ fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230221_predObs_forward
 
 
 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230221_predObs_forwardselected_spatialpredictors.csv') %>% 
+  filter(number_of_spatialpredictors == 0)
 
-d
+df$dens <- col2rgb(densCols(df[['arbuscular_mycorrhizal_richness']], df[['arbuscular_mycorrhizal_richness_Predicted']]))[1,] + 1L
 
+paletteForUse <- c('#d10000', '#ff6622', '#ffda21', '#33dd00', '#1133cc', '#220066', '#330044')
+colors <-  colorRampPalette(paletteForUse)(256)
 
+# Map densities to colors
+df$colors = colors[df$dens]
 
+df  %>%
+  ggplot(aes(x = arbuscular_mycorrhizal_richness, y = arbuscular_mycorrhizal_richness_Predicted)) +
+  geom_point(color = df$colors) +
+  geom_smooth(method = 'lm', formula = y ~ x, se = FALSE, linetype = 'dashed', color = 'black', size = 0.5) + 
+  geom_abline(size = 0.5) +
+  # geom_point(alpha = 0.2) +
+  theme_minimal() +
+  theme(aspect.ratio = 1,
+        # panel.grid = element_blank(),
+        panel.border = element_rect(fill = NA),
+        plot.title = element_text(hjust = 0.5)) +
+  # theme(axis.title = element_blank()) +
+  facet_wrap(vars(setup), scales = 'free') +
+  xlab("Observed") + ylab("Predicted") 
 
 
 

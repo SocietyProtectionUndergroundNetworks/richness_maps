@@ -15,7 +15,7 @@ guild = 'arbuscular_mycorrhizal'
 
 setupList = [
     'wSpatial_wProject',
-    'wSpatial_woProject'
+    # 'wSpatial_woProject'
 ]
 from itertools import repeat
 mapList = []
@@ -117,14 +117,28 @@ def get_prebObs(tup):
     ]
 
     project_vars = [
-    # 'top',
-    # 'bot',
-    # 'core_length',
-    # 'target_marker', # omit: all the same
-    'sequencing_platform',
-    'sample_type',
-    'primers'
-    ]
+        'sequencing_platform454Roche',
+        'sequencing_platformIllumina',
+        'sample_typerhizosphere_soil',
+        'sample_typesoil',
+        'sample_typetopsoil',
+        'primersAML1_AML2_then_AMV4_5NF_AMDGR',
+        'primersAML1_AML2_then_NS31_AM1',
+        'primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_',
+        'primersAMV4_5F_AMDGR',
+        'primersAMV4_5NF_AMDGR',
+        'primersGeoA2_AML2_then_NS31_AMDGR',
+        'primersGeoA2_NS4_then_NS31_AML2',
+        'primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B',
+        'primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B',
+        'primersNS1_NS4_then_AML1_AML2',
+        'primersNS1_NS4_then_AMV4_5NF_AMDGR',
+        'primersNS1_NS4_then_NS31_AM1',
+        'primersNS1_NS41_then_AML1_AML2',
+        'primersNS31_AM1',
+        'primersNS31_AML2',
+        'primersWANDA_AML2',
+        ]
 
     spatial_preds = ['MEM1', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM4', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM6', 'MEM7', 'MEM8', 'MEM81', 'MEM9']
     
@@ -136,7 +150,7 @@ def get_prebObs(tup):
     ##################################################################################################################################################################
     # Predicted - Observed
     ##################################################################################################################################################################
-    fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizal_wSpatialPreds/arbuscular_mycorrhizal_richness_training_data')
+    fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizaloneHot_wMEM/arbuscular_mycorrhizal_richness_training_data')
 
     classifier = ee.Classifier.smileRandomForest(
             numberOfTrees = 250,
@@ -149,13 +163,31 @@ def get_prebObs(tup):
     # Train the classifier with the collection
     trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
 
-    if setup == 'wSpatial_wProject':
-        fcOI = fcOI.map(lambda f: f.set('sequencing_platform', 1))
-        fcOI = fcOI.map(lambda f: f.set('sample_type', 0))
-        fcOI = fcOI.map(lambda f: f.set('primers', 4))
+    # Set reference level
+    fcOIforClassification = fcOI.map(lambda f: f.set('sequencing_platform454Roche', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sequencing_platformIllumina', 1)) # <- This is the reference level
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typerhizosphere_soil', 1)) # <- This is the reference level
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typesoil', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typetopsoil', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_AMV4_5NF_AMDGR', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_NS31_AM1', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5F_AMDGR', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5NF_AMDGR', 1)) # <- This is the reference level
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_AML2_then_NS31_AMDGR', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_NS4_then_NS31_AML2', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AML1_AML2', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AMV4_5NF_AMDGR', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_NS31_AM1', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS41_then_AML1_AML2', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AM1', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AML2', 0))
+    fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersWANDA_AML2', 0))
 
     # Classify the FC
-    classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
+    classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
 
     # Add coordinates to FC
     predObs = classifiedFC.map(addLatLon)

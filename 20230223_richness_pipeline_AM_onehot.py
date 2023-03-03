@@ -11,6 +11,8 @@ from scipy.spatial import ConvexHull
 from sklearn.decomposition import PCA
 from itertools import combinations
 from itertools import repeat
+from functions.determineBlockSizeForCV import *
+
 ee.Initialize()
 
 today = datetime.date.today().strftime("%Y%m%d")
@@ -31,7 +33,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_8/' + guild + 'oneHot'
+projectFolder = '000_SPUN_GFv4_9/' + guild # + 'wMEM'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -69,13 +71,13 @@ covariateList = [
 'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
 'CHELSA_BIO_Precipitation_Seasonality',
 'ConsensusLandCover_Human_Development_Percentage',
-'ConsensusLandCoverClass_Barren',
-'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
-'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
-'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
-'ConsensusLandCoverClass_Herbaceous_Vegetation',
-'ConsensusLandCoverClass_Mixed_Other_Trees',
-'ConsensusLandCoverClass_Shrubs',
+# 'ConsensusLandCoverClass_Barren',
+# 'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+# 'ConsensusLandCoverClass_Herbaceous_Vegetation',
+# 'ConsensusLandCoverClass_Mixed_Other_Trees',
+# 'ConsensusLandCoverClass_Shrubs',
 'EarthEnvTexture_CoOfVar_EVI',
 'EarthEnvTexture_Correlation_EVI',
 'EarthEnvTexture_Homogeneity_EVI',
@@ -87,16 +89,45 @@ covariateList = [
 'EsaCci_BurntAreasProbability',
 'GHS_Population_Density',
 'GlobBiomass_AboveGroundBiomass',
-'GlobPermafrost_PermafrostExtent',
+# 'GlobPermafrost_PermafrostExtent',
 'MODIS_NPP',
-'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+# 'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
 'SG_Depth_to_bedrock',
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'Pixel_DistanceToNOCentroid',
+'Pixel_DistanceToNWCentroid',
+'Pixel_DistanceToSOCentroid',
+'Pixel_DistanceToSWCentroid',
 ]
 
+# Spatial predictors
+MEM1 = ee.Image("users/olegpril12/SPUN/AMF/MEM1").rename('MEM1')
+MEM10 = ee.Image("users/olegpril12/SPUN/AMF/MEM10").rename('MEM10')
+MEM11 = ee.Image("users/olegpril12/SPUN/AMF/MEM11").rename('MEM11')
+MEM13 = ee.Image("users/olegpril12/SPUN/AMF/MEM13").rename('MEM13')
+MEM18 = ee.Image("users/olegpril12/SPUN/AMF/MEM18").rename('MEM18')
+MEM19 = ee.Image("users/olegpril12/SPUN/AMF/MEM19").rename('MEM19')
+MEM20 = ee.Image("users/olegpril12/SPUN/AMF/MEM20").rename('MEM20')
+MEM30 = ee.Image("users/olegpril12/SPUN/AMF/MEM30").rename('MEM30')
+MEM35 = ee.Image("users/olegpril12/SPUN/AMF/MEM35").rename('MEM35')
+MEM37 = ee.Image("users/olegpril12/SPUN/AMF/MEM37").rename('MEM37')
+MEM4 = ee.Image("users/olegpril12/SPUN/AMF/MEM4").rename('MEM4')
+MEM45 = ee.Image("users/olegpril12/SPUN/AMF/MEM45").rename('MEM45')
+MEM51 = ee.Image("users/olegpril12/SPUN/AMF/MEM51").rename('MEM51')
+MEM52 = ee.Image("users/olegpril12/SPUN/AMF/MEM52").rename('MEM52')
+MEM58 = ee.Image("users/olegpril12/SPUN/AMF/MEM58").rename('MEM58')
+MEM6 = ee.Image("users/olegpril12/SPUN/AMF/MEM6").rename('MEM6')
+MEM7 = ee.Image("users/olegpril12/SPUN/AMF/MEM7").rename('MEM7')
+MEM8 = ee.Image("users/olegpril12/SPUN/AMF/MEM8").rename('MEM8')
+MEM81 = ee.Image("users/olegpril12/SPUN/AMF/MEM81").rename('MEM81')
+MEM9 = ee.Image("users/olegpril12/SPUN/AMF/MEM9").rename('MEM9')
+
+AM_spatial = ee.Image.cat(MEM1, MEM10, MEM11, MEM13, MEM18, MEM19, MEM20, MEM30, MEM35, MEM37, MEM4, MEM45, MEM51, MEM52, MEM58, MEM6, MEM7, MEM8, MEM81, MEM9)
+
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+compositeOfInterest = compositeOfInterest.addBands(AM_spatial).reproject(compositeOfInterest.projection())
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -122,7 +153,9 @@ project_vars = [
 'primersWANDA_AML2',
 ]
 
-covariateList = covariateList + project_vars
+spatial_preds = ['MEM1', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM4', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM6', 'MEM7', 'MEM8', 'MEM81', 'MEM9']
+
+covariateList = covariateList + project_vars #+ spatial_preds
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -139,8 +172,15 @@ kList = list(range(1,k+1))
 # Set number of trees in RF models
 nTrees = 250
 
+# Specify whether to use spatial or random CV
+spatialCV = True 
+
 # Input the name of the property that holds the CV fold assignment
-cvFoldString = 'CV_Fold'
+cvFoldHeader = 'CV_Fold'
+if spatialCV == True:
+    cvFoldString = cvFoldHeader + '_Spatial'
+else:
+    cvFoldString = cvFoldHeader + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
 titleOfCSVWithCVAssignments = classProperty+"_training_data"
@@ -421,19 +461,15 @@ print('Size of original Collection', rawPointCollection.shape[0])
 # Rename classification property column
 rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
-# Convert factors to integers
-rawPointCollection = rawPointCollection.assign(sequencing_platform = (rawPointCollection['sequencing_platform']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(sample_type = (rawPointCollection['sample_type']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(primers = (rawPointCollection['primers']).astype('category').cat.codes)
-rawPointCollection = rawPointCollection.assign(target_marker = (rawPointCollection['target_gene']).astype('category').cat.codes)
-
 # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
 fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
 
-# Remove duplicates
+# Remove duplicates / pixel aggregate
 preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-print('Number of aggregated pixels', preppedCollection.shape[0])
+# preppedCollection = pd.DataFrame(fcToAggregate.groupby(['Pixel_Lat', 'Pixel_Long']).mean().to_records())[covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']+['source']]
 
+print('Number of aggregated pixels', preppedCollection.shape[0])
+preppedCollection.isna().sum()
 # Drop NAs
 preppedCollection = preppedCollection.dropna(how='any')
 print('After dropping NAs', preppedCollection.shape[0])
@@ -445,9 +481,38 @@ if log_transform_classProperty == True:
 # Convert biome column to int, to correct odd rounding errors
 preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
 
+# Generate folds
 # Add fold assignments to each of the points, stratified by biome
-preppedCollection[cvFoldString] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
+preppedCollection[cvFoldHeader+'_Random'] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
 
+# Write the CSV to disk and upload it to Earth Engine as a Feature Collection
+localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
+preppedCollection.to_csv(localPathToCVAssignedData,index=False)
+
+# Run R script to generate spatial folds. Folds are added to the csv file
+R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/generateFoldsForCV.R " + \
+          "--k 10 " + \
+          "--type Hexagon " +  \
+          "--crs EPSG:8857 " + \
+          "--seed 42 " + \
+          "--lon Pixel_Long " + \
+          "--lat Pixel_Lat " + \
+          "--path " + localPathToCVAssignedData]
+
+subprocess.run(R_call, shell = True) 
+
+# Determine block size for spatial folds
+blockCVsize = determineBlockSizeForCV(localPathToCVAssignedData, 'Pixel_Lat', 'Pixel_Long', seed = 42)
+
+# Read in the CSV with the spatial folds
+preppedCollection_wSpatialFolds = pd.read_csv(localPathToCVAssignedData)
+
+# Retain only the spatial fold column of blockcvsize
+preppedCollection_wSpatialFolds[cvFoldHeader+'_Spatial'] = preppedCollection_wSpatialFolds['foldID_' + blockCVsize]
+preppedCollection_wSpatialFolds = preppedCollection_wSpatialFolds.drop(columns = [x for x in preppedCollection_wSpatialFolds.columns if 'foldID_' in x])
+
+# Write the CSV to disk and upload it to Earth Engine as a Feature Collection
+preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
 try:
     # try whether fcOI is present
     fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
@@ -456,11 +521,6 @@ try:
     print(guild, fcOI.size().getInfo())
 
 except Exception as e:
-
-    # Write the CSV to disk and upload it to Earth Engine as a Feature Collection
-    localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
-    preppedCollection.to_csv(localPathToCVAssignedData,index=False)
-
     # Format the bash call to upload the file to the Google Cloud Storage bucket
     gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[localPathToCVAssignedData]+[formattedBucketOI]
     subprocess.run(gsutilBashUploadList)
@@ -502,10 +562,8 @@ fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+
 print(guild + ' hyperparameter tuning')
 
 # Define hyperparameters for grid search
-varsPerSplit_list = list(range(2,8))
-leafPop_list = list(range(2,8))
-# varsPerSplit_list.reverse()
-# leafPop_list.reverse()
+varsPerSplit_list = list(range(6,14,2))
+leafPop_list = list(range(6,14,2))
 
 classifierList = []
 # Create list of classifiers for regression
@@ -583,7 +641,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_woProject.csv', index=False)
+classDfSorted.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_spatialCV.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
@@ -593,132 +651,117 @@ top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('
 
 print('Moving on...')
 
-##################################################################################################################################################################
-# Predicted - Observed
-##################################################################################################################################################################
-fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+# ##################################################################################################################################################################
+# # Predicted - Observed
+# ##################################################################################################################################################################
+# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
-try:
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-    predObs_wResiduals.size().getInfo()
+# try:
+#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#     predObs_wResiduals.size().getInfo()
 
-except Exception as e:
-    def predObs(fcOI):
-        if ensemble == False:
-            # Load the best model from the classifier list
-            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+# except Exception as e:
+#     def predObs(fcOI):
+#         if ensemble == False:
+#             # Load the best model from the classifier list
+#             classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-            # Train the classifier with the collection
-            trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+#             # Train the classifier with the collection
+#             trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
             
-            # Classify the FC
-            classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
+#             # Classify the FC
+#             classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
 
-            return classifiedFC
+#             return classifiedFC
 
-        if ensemble == True:
-            def classifyFC(classifierName):
-                # Load the best model from the classifier list
-                classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+#         if ensemble == True:
+#             def classifyFC(classifierName):
+#                 # Load the best model from the classifier list
+#                 classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
             
-                # Train the classifier with the collection
-                trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+#                 # Train the classifier with the collection
+#                 trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
                 
-                # Set reference level
-                fcOIforClassification = fcOI.map(lambda f: f.set('sequencing_platform454Roche', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sequencing_platformIllumina', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typerhizosphere_soil', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typesoil', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typetopsoil', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_AMV4_5NF_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_NS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5F_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5NF_AMDGR', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_AML2_then_NS31_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_NS4_then_NS31_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AML1_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AMV4_5NF_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_NS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS41_then_AML1_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersWANDA_AML2', 0))
+#                 # Set reference level
+#                 fcOIforClassification = fcOI.map(lambda f: f.set('sequencing_platform454Roche', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sequencing_platformIllumina', 1)) # <- This is the reference level
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typerhizosphere_soil', 1)) # <- This is the reference level
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typesoil', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typetopsoil', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_AMV4_5NF_AMDGR', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_NS31_AM1', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5F_AMDGR', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5NF_AMDGR', 1)) # <- This is the reference level
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_AML2_then_NS31_AMDGR', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_NS4_then_NS31_AML2', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AML1_AML2', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AMV4_5NF_AMDGR', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_NS31_AM1', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS41_then_AML1_AML2', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AM1', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AML2', 0))
+#                 fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersWANDA_AML2', 0))
 
-                # Classify the FC
-                classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
+#                 # Classify the FC
+#                 classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
 
-                return classifiedFC
+#                 return classifiedFC
 
-            # Map function over list of models in ensemble
-            classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
+#             # Map function over list of models in ensemble
+#             classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
 
-            return classifiedFC
+#             return classifiedFC
 
-    # Classify FC
-    predObs = predObs(fcOI)
+#     # Classify FC
+#     predObs = predObs(fcOI)
 
-    # Add coordinates to FC
-    predObs = predObs.map(addLatLon)
+#     # Add coordinates to FC
+#     predObs = predObs.map(addLatLon)
 
-    # reverse log transform predicted and observed values
-    if log_transform_classProperty == True:
-        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+#     # reverse log transform predicted and observed values
+#     if log_transform_classProperty == True:
+#         predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+#         predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
 
-    # Add residuals to FC
-    predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
+#     # Add residuals to FC
+#     predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
 
-    # Export to Assets
-    predObsexport = ee.batch.Export.table.toAsset(
-        collection = predObs_wResiduals,
-        description = classProperty+'_pred_obs',
-        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
-    )
-    predObsexport.start()
+#     # Export to Assets
+#     predObsexport = ee.batch.Export.table.toAsset(
+#         collection = predObs_wResiduals,
+#         description = classProperty+'_pred_obs',
+#         assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
+#     )
+#     predObsexport.start()
 
-    # !! Break and wait
-    count = 1
-    while count >= 1:
-        taskList = [str(i) for i in ee.batch.Task.list()]
-        subsetList = [s for s in taskList if classProperty in s]
-        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-        count = len(subsubList)
-        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
-        time.sleep(normalWaitTime)
-    print('Moving on...')
+#     # !! Break and wait
+#     count = 1
+#     while count >= 1:
+#         taskList = [str(i) for i in ee.batch.Task.list()]
+#         subsetList = [s for s in taskList if classProperty in s]
+#         subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+#         count = len(subsubList)
+#         print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+#         time.sleep(normalWaitTime)
+#     print('Moving on...')
 
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
 
-# Convert to pd
-predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+# # Convert to pd
+# predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
-# Group by sample ID to return mean across ensemble prediction
-predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+# # Group by sample ID to return mean across ensemble prediction
+# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs_woProject.csv')
+# predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs_onehot.csv')
 
 #################################################################################################################################################################
 # Classify image
 #################################################################################################################################################################
 # Reference covariate levels for mapping:
-# top: 0
-# bot: 10
-# core.length: 10
-# Sample.type: soil
-# sequencing_platform: Illumina
-# target_marker: ITS2
-# Primers: ITS3/ITS4
-#
-# Sample S1002 has the reference levels:
-# rawPointCollection[rawPointCollection['sample_id'] == 'S1002']
-
-# Project-specific variables
-# top = ee.Image.constant(0)
-# bot = ee.Image.constant(10)
-# corelength = ee.Image.constant(10)
 sequencing_platform454Roche = ee.Image.constant(0)
 sequencing_platformIllumina = ee.Image.constant(1) # <- This is the reference level
 sample_typerhizosphere_soil = ee.Image.constant(1) # <- This is the reference level
@@ -765,27 +808,27 @@ constant_imgs = ee.ImageCollection.fromImages([
     primersNS31_AML2,
     primersWANDA_AML2,
 ]).toBands().rename([
-    'sequencing_platform454Roche,'
-    'sequencing_platformIllumina,'
-    'sample_typerhizosphere_soil,'
-    'sample_typesoil,'
-    'sample_typetopsoil,'
-    'primersAML1_AML2_then_AMV4_5NF_AMDGR,'
-    'primersAML1_AML2_then_NS31_AM1,'
-    'primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_,'
-    'primersAMV4_5F_AMDGR,'
-    'primersAMV4_5NF_AMDGR,'
-    'primersGeoA2_AML2_then_NS31_AMDGR,'
-    'primersGeoA2_NS4_then_NS31_AML2,'
-    'primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B,'
-    'primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B,'
-    'primersNS1_NS4_then_AML1_AML2,'
-    'primersNS1_NS4_then_AMV4_5NF_AMDGR,'
-    'primersNS1_NS4_then_NS31_AM1,'
-    'primersNS1_NS41_then_AML1_AML2,'
-    'primersNS31_AM1,'
-    'primersNS31_AML2,'
-    'primersWANDA_AML2,'
+    'sequencing_platform454Roche',
+    'sequencing_platformIllumina',
+    'sample_typerhizosphere_soil',
+    'sample_typesoil',
+    'sample_typetopsoil',
+    'primersAML1_AML2_then_AMV4_5NF_AMDGR',
+    'primersAML1_AML2_then_NS31_AM1',
+    'primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_',
+    'primersAMV4_5F_AMDGR',
+    'primersAMV4_5NF_AMDGR',
+    'primersGeoA2_AML2_then_NS31_AMDGR',
+    'primersGeoA2_NS4_then_NS31_AML2',
+    'primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B',
+    'primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B',
+    'primersNS1_NS4_then_AML1_AML2',
+    'primersNS1_NS4_then_AMV4_5NF_AMDGR',
+    'primersNS1_NS4_then_NS31_AM1',
+    'primersNS1_NS41_then_AML1_AML2',
+    'primersNS31_AM1',
+    'primersNS31_AML2',
+    'primersWANDA_AML2',
 ])
 
 def finalImageClassification(compositeImg):
@@ -830,68 +873,68 @@ classifiedImageExport = ee.batch.Export.image.toAsset(
     description = classProperty+'_ClassifiedImage',
     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_ClassifiedImage',
     crs = 'EPSG:4326',
-    crsTransform = '[0.008333333333333333,0,-180,0,-0.008333333333333333,90]',
+    crsTransform = '[0.08333333333333333,0,-180,0,-0.08333333333333333,90]',
     region = exportingGeometry,
     maxPixels = int(1e13),
     pyramidingPolicy = {".default": pyramidingPolicy}
 )
 classifiedImageExport.start()
 
-# ##################################################################################################################################################################
-# # Variable importance metrics
-# ##################################################################################################################################################################
-# if ensemble == False:
-#     classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+##################################################################################################################################################################
+# Variable importance metrics
+##################################################################################################################################################################
+if ensemble == False:
+    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-#     # Train the classifier with the collection
-#     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+    # Train the classifier with the collection
+    trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-#     # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-#     featureImportances = trainedClassifer.explain().get('importance').getInfo()
+    # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+    featureImportances = trainedClassifer.explain().get('importance').getInfo()
 
-#     featureImportances = pd.DataFrame(featureImportances.items(),
-#                                         columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-#                                                                                                 ascending=False)
+    featureImportances = pd.DataFrame(featureImportances.items(),
+                                        columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+                                                                                                ascending=False)
 
-#     # Scale values
-#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
-#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
+    # Scale values
+    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
+    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
 
-# if ensemble == True:
-#     # Instantiate empty dataframe
-#     featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
+if ensemble == True:
+    # Instantiate empty dataframe
+    featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
 
-#     for i in list(range(0,10)):
-#         classifierName = top_10Models.get(i)
-#         classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+    for i in list(range(0,10)):
+        classifierName = top_10Models.get(i)
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-#         # Train the classifier with the collection
-#         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+        # Train the classifier with the collection
+        trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-#         # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-#         featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
-#         featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
-#                                             columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-#                                                                                                     ascending=False)
-#         # Scale values
-#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
-#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
+        # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+        featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
+        featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
+                                            columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+                                                                                                    ascending=False)
+        # Scale values
+        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
+        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
 
-#         featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
+        featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
 
-#     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
+    featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
-# # Write to csv
-# featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
-# featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+# Write to csv
+featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
+featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
 
-# # Create and save plot
-# plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
-#                                 title='Feature Importances')
-# fig = plt.get_figure()
-# fig.savefig('output/'+today+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+# Create and save plot
+plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
+                                title='Feature Importances')
+fig = plt.get_figure()
+fig.savefig('output/'+today+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
 
-# print('Variable importance metrics complete! Moving on...')
+print('Variable importance metrics complete! Moving on...')
 
 # ##################################################################################################################################################################
 # # Bootstrapping
