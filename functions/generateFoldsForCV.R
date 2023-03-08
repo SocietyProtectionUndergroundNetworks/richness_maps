@@ -28,32 +28,23 @@ main <- function(k, type, inputPath, lonString, latString, crs, seed) {
   crs <- args[crs_pos+1]
   seed <- args[seed_pos+1]
   
-  # Set default values 
-  if(length(lonString) == 0){lonString = 'longitude'}
-  if(length(latString) == 0){latString = 'latitude'}
-  if(type == 'Rectangles'){type = 'Rectangle'}
-  if(type == 'Hexagons'){type = 'Hexagon'}
-  if(length(crs) == 0){crs = 'EPSG:4326'}
-  if(length(seed) == 0){seed = 1}
-  
-  # print(commandArgs())
   if(type == 'H3'){print(paste0('Generating ',k,' folds using ',type,' shapes'))}
   if(type %in% c('Rectangle', 'Hexagon')){print(paste0('Generating ',k,' folds using ',type,' shapes in the ',crs,' projection.'))}  
   generateFolds(k, type, inputPath, lonString, latString, crs, seed)
 }
 
 # Function to generate the folds 
-generateFolds <- function(k,
-                          type,
+generateFolds <- function(k = 10,
+                          type = 'Rectangle',
                           inputPath,
-                          lonString,
-                          latString,
-                          crs,
-                          seed) {
+                          lonString = 'longitude',
+                          latString = 'latitude',
+                          crs = 'EPSG:4326',
+                          seed = 123) {
   
   # Load the data and transform into spatial features 
   sampleLocations <- fread(inputPath)
-  sampleLocations_sf <- st_as_sf(sampleLocations, coords=c(lonString, latString), crs=crs)
+  sampleLocations_sf <- st_as_sf(sampleLocations, coords=c(lonString, latString), crs='EPSG:4326')
   
   ### Uber H3 
   # Hexagons with roughly equally sized area
