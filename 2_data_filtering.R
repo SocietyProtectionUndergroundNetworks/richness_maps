@@ -47,11 +47,35 @@ dropped_stats <- df %>%
 # Write to file
 fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230203_GFv4_outlier_removal_stats.csv')
 
+# primers/seq platforms/markers to remove
+seq_platforms_toRemove = "DNBSEQ-G400"
+
+primers_toRemove = c("5.8SR/ITS4", 
+                     "gITS7/NLC2mod", 
+                     "ITS1F_KYO2/LR3 then ITS3_KYO2/LR_KYO1b",
+                     "ITS1F/ITS2", 
+                     "ITS1F/ITS3", 
+                     "ITS3_KYO2/ITS4_KYO3", 
+                     "ITS3-Mix1 to 2/ITS4-cwmix1 + ITS4-cwmix2", 
+                     "ITS3ngs mix/ITS4ngs",
+                     "ITS3ngs1 to 5/ITS4ngs", 
+                     "ITS4_Fun/5.8S_Fun", 
+                     "ITS5/ITS2",  
+                     "ITS5/ITS4", 
+                     "ITS7o/ITS4", 
+                     "ITS9/ITS4")
+
+target_markers_toRemove = "ITS1"
+
 # Filter data
 filtered_data <- df %>% 
   left_join(summary_woBissetYan, by = c("Resolve_Biome", "guild")) %>%
-  filter(rarefied <= cutoff) %>% 
-  mutate(Resolve_Biome = as.factor(Resolve_Biome))
+  filter(rarefied <= cutoff) %>%
+  mutate(Resolve_Biome = as.factor(Resolve_Biome)) %>% 
+  filter(sequencing_platform %notin% seq_platforms_toRemove) %>% 
+  filter(primers %notin% primers_toRemove) %>% 
+  filter(target_gene %notin% target_markers_toRemove)
+  
 
 # Write to file
 fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_sampled_outliersRemoved.csv')

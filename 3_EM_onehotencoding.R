@@ -8,7 +8,7 @@ projectVars <- c('sequencing_platform',
                  'primers')
 
 # Load data
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_sampled_outliersRemoved.csv') %>% 
   select(all_of(projectVars), sample_id)
 
 # Create dummy variables
@@ -26,10 +26,11 @@ names(df_onehot) <- gsub('[.]', '_', names(df_onehot))
 cat(names(df_onehot),sep="\n")
 
 # Print reference levels
-df_onehot %>% filter(sample_id == 'S1002')
+df_onehot %>% filter(sample_id == 'FMS17564v2')
 
-df_final <- df_onehot %>% left_join(., fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled.csv') %>% 
+# Combine into one dataframe
+df_final <- df_onehot %>% left_join(., fread('/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_sampled_outliersRemoved.csv') %>% 
                                       select(-all_of(projectVars)), by = 'sample_id')
 
 # Write to file
-fwrite(df_final, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv')
+fwrite(df_final, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_EM_richness_rarefied_sampled_oneHot.csv')

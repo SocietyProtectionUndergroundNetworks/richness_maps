@@ -170,7 +170,7 @@ kList = list(range(1,k+1))
 nTrees = 250
 
 # Specify whether to use spatial or random CV
-spatialCV = True 
+spatialCV = False 
 
 # Input the name of the property that holds the CV fold assignment
 cvFoldHeader = 'CV_Fold'
@@ -380,10 +380,10 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
 
         if modelType == 'CLASSIFICATION':
             # Compute the overall accuracy of the classification
-            errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels_Random)
+            errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels)
             overallAccuracy_Random = ee.Number(errorMatrix_Random.accuracy())
 
-            errorMatrix_Spatial = classifiedValidationData_Spatial.errorMatrix(classProperty,outputtedPropName_Spatial,categoricalLevels_Spatial)
+            errorMatrix_Spatial = classifiedValidationData_Spatial.errorMatrix(classProperty,outputtedPropName_Spatial,categoricalLevels)
             overallAccuracy_Spatial = ee.Number(errorMatrix_Spatial.accuracy())
             return foldFeature.set('overallAccuracy_Random',overallAccuracy_Random).set('overallAccuracy_Spatial',overallAccuracy_Spatial)
         
@@ -502,7 +502,6 @@ fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_ind
 
 # Remove duplicates / pixel aggregate
 preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-
 print('Number of aggregated pixels', preppedCollection.shape[0])
 
 # Drop NAs
