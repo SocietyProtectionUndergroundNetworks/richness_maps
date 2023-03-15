@@ -252,8 +252,8 @@ strataDict = {
 
 # Specify main bash functions being used
 bashFunction_EarthEngine = '/Users/johanvandenhoogen/opt/anaconda3/envs/ee/bin/earthengine'
-# bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
-bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
+bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
+# bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
 
 # Specify the arguments to these functions
 arglist_preEEUploadTable = ['upload','table']
@@ -995,7 +995,7 @@ stratSample.to_csv(holdingFolder+'/'+bootstrapSamples+'.csv',index=False)
 
 # Format the bash call to upload the files to the Google Cloud Storage bucket
 gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
-# subprocess.run(gsutilBashUploadList)
+subprocess.run(gsutilBashUploadList)
 print(bootstrapSamples+' uploaded to a GCSB!')
 
 # Wait for the GSUTIL uploading process to finish before moving on
