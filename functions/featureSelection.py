@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SequentialFeatureSelector
-from sklearn.pipeline import Pipeline
+# from sklearn.pipeline import Pipeline
 from sklearn.model_selection import LeaveOneGroupOut
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import PredefinedSplit
-from sklearn.model_selection import GridSearchCV
+# from sklearn.model_selection import StratifiedKFold
+# from sklearn.model_selection import PredefinedSplit
+# from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import ParameterGrid
 
@@ -18,85 +18,48 @@ from sklearn.model_selection import ParameterGrid
 randomNr = 42
 
 ### Setup the experiment name and the output directory
-varToModel = 'C_amount'
+varToModel = 'arbuscular_mycorrhizal_richness'
 today = '20230223'
-foldId = 'foldID_7deg'
-dataUsed = 'OrgC_2prcOutliersRemoved'
-experiment = today + '_' + varToModel + '_' + dataUsed
-if not os.path.exists('../output/' + experiment):
-    os.mkdir('../output/' + experiment)
+foldId = 'CV_Fold_Spatial'
+experiment = today + '_' + varToModel 
+if not os.path.exists('output/' + experiment):
+    os.mkdir('output/' + experiment)
 
-### Get all the bootstrapped data
-# listOfPathsToBootstrappedSamples = sorted([f for f in os.listdir('../../data/bootstrappedSamples/generatingFolds/') if f.endswith('_wFoldIDs.csv')])
-
-### Load all the data
-C_type_toPredict = 'organic'
-sampled_data = pd.read_csv('../data/sampled_data.csv', dtype=np.float64, na_values='None').astype({'locationID': np.int32}).drop_duplicates().drop(columns=['longitude','latitude'])
-OrgC_data = pd.read_csv('../data/OrgC_2prcOutliersRemoved.csv', dtype=object, encoding='latin', index_col='uid').astype({'locationID': np.int32,
-                                                                                                        'lower_depth': np.float64,
-                                                                                                        'upper_depth': np.float64,
-                                                                                                        'C_amount': np.float64
-                                                                                                        })
-blockCV = pd.read_csv('../data/bootstrappedSamples/generatingFolds/bootstrappedSample_001_wFoldIDs.csv')[['locationID',foldId]].astype({foldId: np.int32})
-
-# Combine the data into one dataframe
-OrgC_wCov = (OrgC_data.join(sampled_data.set_index('locationID'), on='locationID').join(blockCV.set_index('locationID'), on='locationID')
-                        .assign(depth = lambda x: (x['lower_depth']+x['upper_depth'])/2)
-                        .assign(log_C_amount = lambda x: np.log(x['C_amount']+0.01))
-                        .query('C_type == @C_type_toPredict')
-                        .query(foldId+'.notna().values')
-                        # .query('intensity.notna()', engine='python')
-                        # .sample(2000)
-                        .sample(frac=1, random_state=randomNr))
+df = pd.read_csv('data/arbuscular_mycorrhizal_richness_training_data.csv')
 
 # Define the names of the selected bands
 bandNames = [
-    'CHELSA_BIO_Annual_Mean_Temperature',
-    'CHELSA_BIO_Annual_Precipitation',
-    'CHELSA_BIO_Temperature_Seasonality',
-    'CrowtherLab_SoilMoisture_Mean_downsampled10km',
-    'CHELSA_BIO_Precipitation_Seasonality',
-    'CHELSA_BIO_Precipitation_of_Driest_Month',
-    'CIFOR_TropicalPeatlandDepth',
-    'CSP_Global_Human_Modification',
-    'ConsensusLandCoverClass_Snow_Ice',
-    'CrowtherLab_IntactLandscapes',
-    'CrowtherLab_SoilMoisture_SD_downsampled10km',
-    'SG_Clay_Content_015cm',
-    'EsaCci_MaxPermafrostActiveLayerThickness_downsampled1km',
-    'EarthEnvCloudCover_seasonalCloudConcentration_peakTime',
-    'EarthEnvTopoMed_Eastness',
-    'EarthEnvTopoMed_Northness',
-    'EarthEnvTopoMed_ProfileCurvature',
-    'EarthEnvTopoMed_TopoPositionIndex',
-    'EarthEnvTopoMed_Elevation',
-    'FanEtAl_Depth_to_Water_Table_AnnualMean',
-    'FanEtAl_Depth_to_Water_Table_AnnualSD',
-    'GHS_Population_Density',
-    'GLiM_AcidPlutonicRocks',
-    'GLiM_AcidVolcanicRocks',
-    'GLiM_BasicPlutonicRocks',
-    'GLiM_BasicVolcanicRocks',
-    'GLiM_CarbonateSedimentaryRocks',
-    'GLiM_Evaporites',
-    'GLiM_IntermediatePlutonicRocks',
-    'GLiM_IntermediateVolcanicRocks',
-    'GLiM_MetamorphicRocks',
-    'GLiM_UnconsolidatedSediments',
-    'GLiM_Pyroclastics',
-    'GLiM_SiliciclasticSedimentaryRocks',
-    'GiriEtAl_MangrovesExtent',
-    'PEATMAP_GlobalPeatlandExtent',
-    'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
-    'SG_Depth_to_bedrock',
-    'SG_Sand_Content_015cm',
-    'TerraClimate_AridityIndex_downsampled4km',
-    'TootchiEtAl_WetlandsRegularlyFlooded',
-    'USGS_HighMountainsOrDeepCanyons',
-    'USGS_LowHills',
-    'USGS_SmoothPlains',
-    'WorldClim2_H2OVaporPressure_AnnualSD',
-    'WorldClim2_WindSpeed_AnnualSD'
+'CGIAR_PET',
+'CHELSA_BIO_Annual_Mean_Temperature',
+'CHELSA_BIO_Annual_Precipitation',
+'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
+'CHELSA_BIO_Precipitation_Seasonality',
+'ConsensusLandCover_Human_Development_Percentage',
+# 'ConsensusLandCoverClass_Barren',
+# 'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+# 'ConsensusLandCoverClass_Herbaceous_Vegetation',
+# 'ConsensusLandCoverClass_Mixed_Other_Trees',
+# 'ConsensusLandCoverClass_Shrubs',
+'EarthEnvTexture_CoOfVar_EVI',
+'EarthEnvTexture_Correlation_EVI',
+'EarthEnvTexture_Homogeneity_EVI',
+'EarthEnvTopoMed_AspectCosine',
+'EarthEnvTopoMed_AspectSine',
+'EarthEnvTopoMed_Elevation',
+'EarthEnvTopoMed_Slope',
+'EarthEnvTopoMed_TopoPositionIndex',
+'EsaCci_BurntAreasProbability',
+'GHS_Population_Density',
+'GlobBiomass_AboveGroundBiomass',
+# 'GlobPermafrost_PermafrostExtent',
+'MODIS_NPP',
+# 'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+'SG_Depth_to_bedrock',
+'SG_Sand_Content_005cm',
+'SG_SOC_Content_005cm',
+'SG_Soil_pH_H2O_005cm',
 ]
 
 ### ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ###
@@ -120,11 +83,11 @@ defaultParamsGrid = {
         'max_samples': 0.632
     },
     'smileRF':{# smileRF in Google Earth Engine
-        'n_estimators':50, # not specified
-        'max_depth':None,
-        'max_features':'sqrt',
-        'max_samples': 0.5,
-        'min_samples_leaf':1,
+        'n_estimators':50, 
+        'max_depth':None, # maxNodes
+        'max_features':'sqrt', # variablesPerSplit
+        'max_samples': 0.5, # bagFraction
+        'min_samples_leaf':1, # minLeafPopulation
     },
     'sklearn':{# randomForestRegressor in sklearn
         'n_estimators':50, # default: 100
@@ -154,7 +117,7 @@ def getRegressionMatrix(originalDF, covariates, classProperty, missingValue):
 #     return newDict
 
 # Function that defines a Forward Feature Selection algorithm
-def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='auto', scoring=['neg_root_mean_squared_error','r2'], tryOut=False, newOutput=False, v=True):
+def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='auto', direction = 'forward', scoring=['neg_root_mean_squared_error','r2'], tryOut=False, newOutput=False, v=True):
     global dict
     # Reduce the number of bands if you want to try out the algorithm to make it run faster
     if tryOut!=False:
@@ -192,12 +155,12 @@ def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='a
 
     # Setup the output
     if newOutput:
-        try: os.remove('../output/' + experiment + '/gridSearchResults.csv')
+        try: os.remove('output/' + experiment + '/gridSearchResults.csv')
         except FileNotFoundError: pass
 
     # Load the old output and get the parameter combinations that were already tested
     try:
-        prevParams = pd.read_csv('../output/' + experiment + '/gridSearchResults.csv')['params']
+        prevParams = pd.read_csv('output/' + experiment + '/gridSearchResults.csv')['params']
         for i in prevParams:
             try:
                 grid.remove(eval(i))
@@ -206,7 +169,7 @@ def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='a
 
     # Compute the results
     ind = 0
-    if v == True: print('Fitting {0} folds for each of {1} candidates, totalling {2} fits'.format(len(OrgC_wCov[foldId].drop_duplicates()),len(grid),len(OrgC_wCov[foldId].drop_duplicates())*len(grid)))
+    if v == True: print('Fitting {0} folds for each of {1} candidates, totalling {2} fits'.format(len(df[foldId].drop_duplicates()),len(grid),len(df[foldId].drop_duplicates())*len(grid)))
     for comboDict in grid:
         ind =+ 1
         t1 = time.time()
@@ -215,8 +178,9 @@ def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='a
         # Define a sequential feature addition algorithm
         sfs = SequentialFeatureSelector(estimator=clf,
                                         n_features_to_select=n_features_to_select,
-                                        cv=list(LeaveOneGroupOut().split(X_fit, y, groups=OrgC_wCov[foldId])),
+                                        cv=list(LeaveOneGroupOut().split(X_fit, y, groups=df[foldId])),
                                         scoring='neg_root_mean_squared_error',
+                                        direction=direction,
                                         tol=0,
                                         n_jobs=-1).fit(X_fit, y)
         tdiff = time.time() - t1
@@ -224,11 +188,11 @@ def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='a
         bestFeatures = sorted(sfs.get_feature_names_out())
         X_fit_red = X_fit[bestFeatures]
         # Save the scorings
-        scorings = cross_validate(clf, X=X_fit_red, y=y, scoring=scoring, cv=list(LeaveOneGroupOut().split(X_fit, y, groups=OrgC_wCov[foldId])), n_jobs=-1)
-        scoringDF = pd.DataFrame({'mean_fit_time': [scorings['fit_time'].mean()],
-                                  'std_fit_time': [scorings['fit_time'].std()],
-                                  'mean_score_time': [scorings['score_time'].mean()],
-                                  'std_score_time': [scorings['score_time'].std()],
+        scorings = cross_validate(clf, X=X_fit_red, y=y, scoring=scoring, cv=list(LeaveOneGroupOut().split(X_fit, y, groups=df[foldId])), n_jobs=-1)
+        scoringDF = pd.DataFrame({#'mean_fit_time': [scorings['fit_time'].mean()],
+                                  #'std_fit_time': [scorings['fit_time'].std()],
+                                  #'mean_score_time': [scorings['score_time'].mean()],
+                                  #'std_score_time': [scorings['score_time'].std()],
                                   'params':[comboDict]
                                   })
         if len(scoring) == 1:
@@ -249,19 +213,20 @@ def FFS(X, y, params='sklearn', nParamCombsToTry = None, n_features_to_select='a
                 string += '' + scoring[s] + '=' + str(round(scoringDF['mean_test_' + scoring[s]], 2)[0]) + ' - '
             print('[DONE {0: >2}] - {1}s - {2}{3}'.format(ind, round(tdiff, 1), string, str(comboDict).replace('{','').replace('}','').replace("'",'').replace(": ",'=').replace(",",';')))
         # Write the results to a dataframe
-        with open('../output/' + experiment + '/gridSearchResults.csv', 'a') as f:
+        with open('output/' + experiment + '/gridSearchResults.csv', 'a') as f:
             scoringDF.to_csv(f, mode='a', header=f.tell()==0)
 
 
 if __name__ == '__main__':
     # Get the regression matrix
-    X, y = getRegressionMatrix(OrgC_wCov, bandNames + ['upper_depth', 'lower_depth'], varToModel, missingValue=0)
-
+    X, y = getRegressionMatrix(df, bandNames, varToModel, missingValue=0)
+    
     # Optional: define a grid of hyper-parameters to search over
     hyperParameterGrid = ({
-        'max_features': [0.333, None],
-        'max_samples': [0.632, 0.8, 1],
-        'min_samples_leaf': [1, 5, 10, 20],
+        'max_features': [None], # all features
+        'max_samples': [0.632], #bagFraction 
+        'min_samples_leaf': list(range(2,14,2)), # minLeafPopulation
+        'min_samples_split': list(range(2,10,2)), # minLeafPopulation
         'max_depth':[20, 25, None]
     })
 
@@ -283,12 +248,13 @@ if __name__ == '__main__':
     # It reduces the number of features to the integer specified or to 1/3 if set to True.
     # {newOutput} removes the output file if set to True before running the algorithm.
     FFS(X, y,
-        params=hyperParameterGrid,
+        params=hyperParameterGrid,#defaultParamsGrid['smileRF'],
         nParamCombsToTry = False,
         n_features_to_select='auto',
+        direction = 'backward',
         scoring=['neg_root_mean_squared_error','r2'],
         tryOut=False,
-        newOutput=False)
+        newOutput=True)
 
 
 
@@ -301,8 +267,8 @@ if __name__ == '__main__':
 # from shapely.geometry import Point
 # import geopandas as gpd
 # from geopandas import GeoDataFrame
-# geometry = [Point(xy) for xy in zip(OrgC_wCov['longitude'].astype('float64'), OrgC_wCov['latitude'].astype('float64'))]
-# gdf = GeoDataFrame(OrgC_wCov, geometry=geometry)
+# geometry = [Point(xy) for xy in zip(df['longitude'].astype('float64'), df['latitude'].astype('float64'))]
+# gdf = GeoDataFrame(df, geometry=geometry)
 # gdf[foldId] = gdf[foldId].astype('int')
 # world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
 # gdf.plot(column=gdf[foldId], ax=world.plot(figsize=(10, 6), color='grey'), marker='o', markersize=15, cmap='tab10', vmin=1, vmax=20)
