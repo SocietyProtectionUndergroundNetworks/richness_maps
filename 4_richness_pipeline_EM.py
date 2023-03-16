@@ -72,13 +72,13 @@ covariateList = [
 'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
 'CHELSA_BIO_Precipitation_Seasonality',
 'ConsensusLandCover_Human_Development_Percentage',
-'ConsensusLandCoverClass_Barren',
-'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
-'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
-'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
-'ConsensusLandCoverClass_Herbaceous_Vegetation',
-'ConsensusLandCoverClass_Mixed_Other_Trees',
-'ConsensusLandCoverClass_Shrubs',
+# 'ConsensusLandCoverClass_Barren',
+# 'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+# 'ConsensusLandCoverClass_Herbaceous_Vegetation',
+# 'ConsensusLandCoverClass_Mixed_Other_Trees',
+# 'ConsensusLandCoverClass_Shrubs',
 'EarthEnvTexture_CoOfVar_EVI',
 'EarthEnvTexture_Correlation_EVI',
 'EarthEnvTexture_Homogeneity_EVI',
@@ -90,9 +90,9 @@ covariateList = [
 'EsaCci_BurntAreasProbability',
 'GHS_Population_Density',
 'GlobBiomass_AboveGroundBiomass',
-'GlobPermafrost_PermafrostExtent',
+# 'GlobPermafrost_PermafrostExtent',
 'MODIS_NPP',
-'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+# 'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
 'SG_Depth_to_bedrock',
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
@@ -1064,8 +1064,8 @@ if ensemble == True:
     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
 # Write to csv
-featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
 featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
 
 # Create and save plot
 plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
