@@ -96,10 +96,6 @@ covariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
-# 'Pixel_DistanceToNOCentroid', 
-# 'Pixel_DistanceToNWCentroid', 
-# 'Pixel_DistanceToSOCentroid', 
-# 'Pixel_DistanceToSWCentroid', 
 ]
 
 # Spatial predictors
