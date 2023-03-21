@@ -576,10 +576,8 @@ except Exception as e:
 fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
 # Define hyperparameters for grid search
-varsPerSplit_list = list(range(2,8))
-leafPop_list = list(range(2,8))
-# varsPerSplit_list.reverse()
-# leafPop_list.reverse()
+varsPerSplit_list = list(range(4,14,2))
+leafPop_list = list(range(2,14,2))
 
 classifierListRegression = []
 # Create list of classifiers for regression

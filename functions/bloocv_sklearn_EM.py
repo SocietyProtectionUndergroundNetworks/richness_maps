@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -7,12 +9,12 @@ from shapely.geometry import Point
 from sklearn.metrics import r2_score
 from sklearn.model_selection import LeaveOneOut
 from sklearn.ensemble import RandomForestRegressor
-from tqdm import tqdm
+# from tqdm import tqdm
 from contextlib import contextmanager
 
 # Constants
-classProperty = 'arbuscular_mycorrhizal_richness'
-df = pd.read_csv('data/arbuscular_mycorrhizal_richness_training_data.csv')#, nrows=20)
+classProperty = 'ectomycorrhizal_richness'
+df = pd.read_csv('data/ectomycorrhizal_richness_training_data.csv')#, nrows=20)
 
 # Convert DataFrame to GeoDataFrame
 geometry = [Point(xy) for xy in zip(df['Pixel_Long'], df['Pixel_Lat'])]
@@ -59,25 +61,32 @@ covariateList = [
 project_vars = [
 'sequencing_platform454Roche',
 'sequencing_platformIllumina',
+'sequencing_platformIonTorrent',
+'sequencing_platformPacBio',
 'sample_typerhizosphere_soil',
 'sample_typesoil',
 'sample_typetopsoil',
-'primersAML1_AML2_then_AMV4_5NF_AMDGR',
-'primersAML1_AML2_then_NS31_AM1',
-'primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_',
-'primersAMV4_5F_AMDGR',
-'primersAMV4_5NF_AMDGR',
-'primersGeoA2_AML2_then_NS31_AMDGR',
-'primersGeoA2_NS4_then_NS31_AML2',
-'primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B',
-'primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B',
-'primersNS1_NS4_then_AML1_AML2',
-'primersNS1_NS4_then_AMV4_5NF_AMDGR',
-'primersNS1_NS4_then_NS31_AM1',
-'primersNS1_NS41_then_AML1_AML2',
-'primersNS31_AM1',
-'primersNS31_AML2',
-'primersWANDA_AML2',
+'primers5_8S_Fun_ITS4_Fun',
+'primersfITS7_ITS4',
+'primersfITS9_ITS4',
+'primersgITS7_ITS4',
+'primersgITS7_ITS4_then_ITS9_ITS4',
+'primersgITS7_ITS4_ITS4arch',
+'primersgITS7_ITS4m',
+'primersgITS7_ITS4ngs',
+'primersgITS7ngs_ITS4ngsUni',
+'primersITS_S2F___ITS3_mixed_1_1_ITS4',
+'primersITS1_ITS4',
+'primersITS1F_ITS4',
+'primersITS1F_ITS4_then_fITS7_ITS4',
+'primersITS1F_ITS4_then_ITS3_ITS4',
+'primersITS1ngs_ITS4ngs_or_ITS1Fngs_ITS4ngs',
+'primersITS3_KYO2_ITS4',
+'primersITS3_ITS4',
+'primersITS3ngs1_to_5___ITS3ngs10_ITS4ngs',
+'primersITS3ngs1_to_ITS3ngs11_ITS4ngs',
+'primersITS86F_ITS4',
+'primersITS9MUNngs_ITS4ngsUni',
 ]
 
 # Create final list of covariates
@@ -95,19 +104,19 @@ def run_spatial_loo_cv(buffer_size, rep):
     classifier = RandomForestRegressor()
 
     # Read in the grid search results from GEE
-    grid_search_results = pd.read_csv('output/20230315_arbuscular_mycorrhizal_richness_grid_search_results_spatialCV.csv')
+    grid_search_results = pd.read_csv('output/20230317_ectomycorrhizal_richness_grid_search_results_Regression_zeroInflated.csv')
     VPS = grid_search_results['cName'][rep].split('VPS')[1].split('_')[0]
     LP = grid_search_results['cName'][rep].split('LP')[1].split('_')[0]
-    MN = grid_search_results['cName'][rep].split('MN')[1].split('_')[0]
-    if MN == 'None':
-        MN = None
-    else:
-        MN = np.int(MN)
+    # MN = grid_search_results['cName'][rep].split('MN')[1].split('_')[0]
+    # if MN == 'None':
+    #     MN = None
+    # else:
+    #     MN = np.int(MN)
 
     # Define the hyperparameters
     hyperparameters = {
         'n_estimators': 25, # number of trees
-        'max_depth': MN, # maxNodes
+        # 'max_depth': MN, # maxNodes
         'min_samples_split': np.int(LP), # minLeafPopulation
         'max_features': np.int(VPS), # variablesPerSplit
         'max_samples': 0.632, # bagFraction
@@ -118,18 +127,15 @@ def run_spatial_loo_cv(buffer_size, rep):
     classifier.set_params(**hyperparameters)
 
     # Prepare data
-    # X = gdf_proj[covariateList].sample(n = 1000, random_state = rep).values
-    # y = gdf_proj[classProperty].sample(n = 1000, random_state = rep).values
-   
-    sampled_gdf_proj = gdf_proj.sample(n = 10000, random_state = rep)
-    X = sampled_gdf_proj[covariateList].values
-    y = sampled_gdf_proj[classProperty].values
+    X = gdf_proj[covariateList].sample(n = 1000, random_state = rep).values
+    y = gdf_proj[classProperty].sample(n = 1000, random_state = rep).values
 
     predictions = []
 
     # Perform spatial Leave-One-Out Cross-Validation
     n_splits = loo.get_n_splits(X)
-    for train_idx, test_idx in tqdm(loo.split(X), total=n_splits, desc=f"Spatial LOO CV (buffer={buffer_size})"):
+    # for train_idx, test_idx in tqdm(loo.split(X), total=n_splits, desc=f"Spatial LOO CV (buffer={buffer_size})"):
+    for train_idx, test_idx in loo.split(X):
         test_point = gdf_proj.iloc[test_idx[0]]['geometry_buffer']
         train_points = gdf_proj#.iloc[train_idx]
         train_points = train_points[train_points['geometry'].disjoint(test_point)]
@@ -141,8 +147,8 @@ def run_spatial_loo_cv(buffer_size, rep):
             predictions.append(np.nan)
 
     # Calculate R-squared value
-    r2 = r2_score(np.random.choice(y, size = 1000), predictions)
-    r2
+    r2 = r2_score(y, predictions)
+
     output = pd.DataFrame({'r2': r2,
                            'rep': rep,
                            'buffer_size': buffer_size}, index=[0])
@@ -160,14 +166,13 @@ if __name__ == '__main__':
     # Define the list of buffer sizes to use 
     buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000]
     reps = list(range(0,10))
-        # Define the list of buffer sizes to use
-    buffer_sizes = [10000, 250000, 1000000]
-    reps = list(range(0,3))
 
-    NPROC = 7
+    NPROC = 72
+    NPROC = multiprocessing.cpu_count()
+
     with poolcontext(NPROC) as pool:
         results = pool.starmap(run_spatial_loo_cv, list(itertools.product(buffer_sizes, reps)))
        
         # Combine the results into a single dataframe and save to CSV
         combined = pd.concat(results)
-        combined.to_csv("output/SLOO_CV_AM.csv")
+        combined.to_csv("output/SLOO_CV_EM.csv")

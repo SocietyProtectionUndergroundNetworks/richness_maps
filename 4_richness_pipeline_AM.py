@@ -596,26 +596,23 @@ print(guild + ' hyperparameter tuning')
 # Define hyperparameters for grid search
 varsPerSplit_list = list(range(4,14,2))
 leafPop_list = list(range(2,14,2))
-maxNodes_list = [15, 20, None]
 
 classifierList = []
 # Create list of classifiers for regression
-for mn in maxNodes_list:
-    for vps in varsPerSplit_list:
-        for lp in leafPop_list:
+for vps in varsPerSplit_list:
+    for lp in leafPop_list:
 
-            model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + '_MN' + str(mn) + '_REGRESSION'
+        model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + '_REGRESSION'
 
-            rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
-            numberOfTrees = nTrees,
-            variablesPerSplit = vps,
-            minLeafPopulation = lp,
-            maxNodes = mn,
-            bagFraction = 0.632,
-            seed = 42
-            ).setOutputMode('REGRESSION'))
+        rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
+        numberOfTrees = nTrees,
+        variablesPerSplit = vps,
+        minLeafPopulation = lp,
+        bagFraction = 0.632,
+        seed = 42
+        ).setOutputMode('REGRESSION'))
 
-            classifierList.append(rf)
+        classifierList.append(rf)
 
 # # If grid search was not performed yet:
 # Make a feature collection from the k-fold assignment list

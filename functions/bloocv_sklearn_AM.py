@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -98,16 +100,10 @@ def run_spatial_loo_cv(buffer_size, rep):
     grid_search_results = pd.read_csv('output/20230315_arbuscular_mycorrhizal_richness_grid_search_results_spatialCV.csv')
     VPS = grid_search_results['cName'][rep].split('VPS')[1].split('_')[0]
     LP = grid_search_results['cName'][rep].split('LP')[1].split('_')[0]
-    MN = grid_search_results['cName'][rep].split('MN')[1].split('_')[0]
-    if MN == 'None':
-        MN = None
-    else:
-        MN = np.int(MN)
-
+ 
     # Define the hyperparameters
     hyperparameters = {
         'n_estimators': 25, # number of trees
-        'max_depth': MN, # maxNodes
         'min_samples_split': np.int(LP), # minLeafPopulation
         'max_features': np.int(VPS), # variablesPerSplit
         'max_samples': 0.632, # bagFraction
@@ -118,12 +114,8 @@ def run_spatial_loo_cv(buffer_size, rep):
     classifier.set_params(**hyperparameters)
 
     # Prepare data
-    # X = gdf_proj[covariateList].sample(n = 1000, random_state = rep).values
-    # y = gdf_proj[classProperty].sample(n = 1000, random_state = rep).values
-   
-    sampled_gdf_proj = gdf_proj.sample(n = 10000, random_state = rep)
-    X = sampled_gdf_proj[covariateList].values
-    y = sampled_gdf_proj[classProperty].values
+    X = gdf_proj[covariateList].values
+    y = gdf_proj[classProperty].values
 
     predictions = []
 
@@ -141,8 +133,8 @@ def run_spatial_loo_cv(buffer_size, rep):
             predictions.append(np.nan)
 
     # Calculate R-squared value
-    r2 = r2_score(np.random.choice(y, size = 1000), predictions)
-    r2
+    r2 = r2_score(y, predictions)
+
     output = pd.DataFrame({'r2': r2,
                            'rep': rep,
                            'buffer_size': buffer_size}, index=[0])
@@ -164,7 +156,7 @@ if __name__ == '__main__':
     buffer_sizes = [10000, 250000, 1000000]
     reps = list(range(0,3))
 
-    NPROC = 7
+    NPROC = 72
     with poolcontext(NPROC) as pool:
         results = pool.starmap(run_spatial_loo_cv, list(itertools.product(buffer_sizes, reps)))
        
