@@ -9,23 +9,23 @@ from contextlib import contextmanager
 
 ee.Initialize()
 
-arbuscular_mycorrhizal_richness_predicted_regular = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizal/arbuscular_mycorrhizal_richness_ClassifiedImage').rename('arbuscular_mycorrhizal_richness_predicted_regular')
-arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizal_wSpatialPreds/arbuscular_mycorrhizal_richness_ClassifiedImage').rename('arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors')
 
-compositeToUse = ee.Image.cat(arbuscular_mycorrhizal_richness_predicted_regular, arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors, ee.Image.pixelLonLat().reproject(arbuscular_mycorrhizal_richness_predicted_regular.projection()))
+arbuscular_mycorrhizal_richness_predicted_regular = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_9/arbuscular_mycorrhizal/arbuscular_mycorrhizal_richness_Classified_MultibandImage')
+# arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizal_wSpatialPreds/arbuscular_mycorrhizal_richness_ClassifiedImage').rename('arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors')
+
+# compositeToUse = ee.Image.cat(arbuscular_mycorrhizal_richness_predicted_regular, arbuscular_mycorrhizal_richness_predicted_wSpatialPredictors, ee.Image.pixelLonLat().reproject(arbuscular_mycorrhizal_richness_predicted_regular.projection()))
+compositeToUse = arbuscular_mycorrhizal_richness_predicted_regular
 
 # FeatureCollection to sample
-points = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_8/arbuscular_mycorrhizal_wSpatialPreds/arbuscular_mycorrhizal_richness_training_data').select(['arbuscular_mycorrhizal_richness', 'sample_id'])
+points = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_9/arbuscular_mycorrhizal/arbuscular_mycorrhizal_richness_training_data').select(['arbuscular_mycorrhizal_richness', 'sample_id'])
 
 
-# compositeToUse = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_6/ectomycorrhizal/ectomycorrhizal_richnessclassifiedImage_zeroInflated').select('ectomycorrhizal_richness_Predicted')
-# compositeToUse = compositeToUse.addBands(ee.Image.pixelLonLat().reproject(compositeToUse.projection()))
+# compositeToUse = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_9/ectomycorrhizal/ectomycorrhizal_richness_Classified_MultibandImage')
 
 # # FeatureCollection to sample
-# points = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_7/ectomycorrhizal/ectomycorrhizal_richness_training_data').select('ectomycorrhizal_richness')
+# points = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_9/ectomycorrhizal/ectomycorrhizal_richness_training_data')
 
 # points = points.map(lambda f: f.set('ectomycorrhizal_richness', ee.Number(f.get('ectomycorrhizal_richness')).exp().subtract(1)))
-
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']
@@ -140,4 +140,4 @@ if __name__ == '__main__':
 						partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
 						range(0, size))
 				results = pd.concat(results)
-				results.to_csv("data/202300221_AM_predObs_sampled.csv")
+				results.to_csv("data/20230323_AM_predObs_sampled.csv")

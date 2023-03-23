@@ -1008,14 +1008,11 @@ def finalImageClassification(compositeImg):
 compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
 classifiedImage = finalImageClassification(compositeToClassify)
 
-if log_transform_classProperty == True:
-    regressedImage = classifiedImage.select(classProperty+'_Regressed').exp().subtract(1)
-if log_transform_classProperty == False:
-    regressedImage = classifiedImage.select(classProperty+'_Regressed')
+regressedImage = classifiedImage.select(classProperty+'_Regressed')
 classifiedImage = classifiedImage.select(classProperty+'_Classified')
-finalPredictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'_Predicted')
+predictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'_Predicted')
 
-classifiedImage = ee.Image.cat(regressedImage, classifiedImage, finalPredictedImage)
+ensemblePredictedImage = ee.Image.cat(regressedImage, classifiedImage, predictedImage)
 
 ##################################################################################################################################################################
 # Variable importance metrics
@@ -1309,7 +1306,7 @@ PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVarian
 # Construct final image to export
 if log_transform_classProperty == True:
     finalImageToExport = ee.Image.cat(
-    classifiedImage.select(0).exp().subtract(1).rename(classProperty+'_Ensemble_mean'),
+    ensemblePredictedImage.select(0).exp().subtract(1).rename(classProperty+'_Ensemble_mean'),
     meanImage.exp().subtract(1).rename(classProperty+'_Bootstrapped_mean'),
     upperLowerCIImage.select(0).exp().subtract(1).rename(classProperty+'_Bootstrapped_lower'),
     upperLowerCIImage.select(1).exp().subtract(1).rename(classProperty+'_Bootstrapped_upper'),
@@ -1319,7 +1316,7 @@ if log_transform_classProperty == True:
     PCA_int_ext.rename('PCA_pct_int_ext'))
 else:
     finalImageToExport = ee.Image.cat(
-    classifiedImage.select(0).rename(classProperty+'_Ensemble_mean'),
+    ensemblePredictedImage.select(0).rename(classProperty+'_Ensemble_mean'),
     meanImage.rename(classProperty+'_Bootstrapped_mean'),
     upperLowerCIImage.select(0).rename(classProperty+'_Bootstrapped_lower'),
     upperLowerCIImage.select(1).rename(classProperty+'_Bootstrapped_upper'),
