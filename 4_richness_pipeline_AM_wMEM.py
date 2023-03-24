@@ -33,7 +33,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_9/' + guild # + 'wMEM'
+projectFolder = '000_SPUN_GFv4_9/' + guild + 'wMEM'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -151,7 +151,7 @@ project_vars = [
 
 spatial_preds = ['MEM1', 'MEM4', 'MEM6', 'MEM7', 'MEM8', 'MEM9', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM81']
                 
-covariateList = covariateList + project_vars #+ spatial_preds
+covariateList = covariateList + project_vars + spatial_preds
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -183,7 +183,7 @@ else:
     sort_acc_prop = sort_acc_prop + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
-titleOfCSVWithCVAssignments = classProperty+"_training_data"
+titleOfCSVWithCVAssignments = classProperty+"_training_data_wMEMs"
 
 # Asset ID of uploaded dataset after processing
 assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
@@ -487,63 +487,65 @@ else:
 ####################################################################################################################################################################
 # Data processing
 ####################################################################################################################################################################
-# Import raw data
-rawPointCollection = pd.read_csv('data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
-print('Size of original Collection', rawPointCollection.shape[0])
+# # Import raw data
+# rawPointCollection = pd.read_csv('data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+# print('Size of original Collection', rawPointCollection.shape[0])
 
-# Rename classification property column
-rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
+# # Rename classification property column
+# rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
-# Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+# # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
+# fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
 
-# Remove duplicates / pixel aggregate
-preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
-print('Number of aggregated pixels', preppedCollection.shape[0])
+# # Remove duplicates / pixel aggregate
+# preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
+# print('Number of aggregated pixels', preppedCollection.shape[0])
 
-# Drop NAs
-preppedCollection = preppedCollection.dropna(how='any')
-print('After dropping NAs', preppedCollection.shape[0])
+# # Drop NAs
+# preppedCollection = preppedCollection.dropna(how='any')
+# print('After dropping NAs', preppedCollection.shape[0])
 
-# Log transform classProperty; if specified
-if log_transform_classProperty == True:
-    preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
+# # Log transform classProperty; if specified
+# if log_transform_classProperty == True:
+#     preppedCollection[classProperty] = np.log(preppedCollection[classProperty] + 1)
 
-# Convert biome column to int, to correct odd rounding errors
-preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
+# # Convert biome column to int, to correct odd rounding errors
+# preppedCollection[stratificationVariableString] = preppedCollection[stratificationVariableString].astype(int)
 
-# Generate random folds, stratified by biome
-preppedCollection[cvFoldString_Random] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
+# # Generate random folds, stratified by biome
+# preppedCollection[cvFoldString_Random] = (preppedCollection.groupby('Resolve_Biome').cumcount() % k) + 1
 
-# Write the CSV to disk and upload it to Earth Engine as a Feature Collection
+# # Write the CSV to disk and upload it to Earth Engine as a Feature Collection
+# localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
+# preppedCollection.to_csv(localPathToCVAssignedData,index=False)
+
+# # Generate spatial folds. Folds are added to the csv file
+# R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/generateFoldsForCV.R " + \
+#           "--k 10 " + \
+#           "--type Hexagon " +  \
+#           "--crs EPSG:8857 " + \
+#           "--seed 42 " + \
+#           "--lon Pixel_Long " + \
+#           "--lat Pixel_Lat " + \
+#           "--path " + localPathToCVAssignedData]
+
+# # Run the R script
+# subprocess.run(R_call, shell = True) 
+
+# # Determine block size for spatial folds
+# blockCVsize = determineBlockSizeForCV(localPathToCVAssignedData, 'Pixel_Lat', 'Pixel_Long', seed = 42)
+
+# # Read in the CSV with the spatial folds
+# preppedCollection_wSpatialFolds = pd.read_csv(localPathToCVAssignedData)
+
+# # Retain only the spatial fold column of blockcvsize
+# preppedCollection_wSpatialFolds[cvFoldString_Spatial] = preppedCollection_wSpatialFolds['foldID_' + blockCVsize]
+# preppedCollection_wSpatialFolds = preppedCollection_wSpatialFolds.drop(columns = [x for x in preppedCollection_wSpatialFolds.columns if 'foldID_' in x])
+
+# # Write the CSV to disk 
+# preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
 localPathToCVAssignedData = holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv'
-preppedCollection.to_csv(localPathToCVAssignedData,index=False)
-
-# Generate spatial folds. Folds are added to the csv file
-R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/generateFoldsForCV.R " + \
-          "--k 10 " + \
-          "--type Hexagon " +  \
-          "--crs EPSG:8857 " + \
-          "--seed 42 " + \
-          "--lon Pixel_Long " + \
-          "--lat Pixel_Lat " + \
-          "--path " + localPathToCVAssignedData]
-
-# Run the R script
-subprocess.run(R_call, shell = True) 
-
-# Determine block size for spatial folds
-blockCVsize = determineBlockSizeForCV(localPathToCVAssignedData, 'Pixel_Lat', 'Pixel_Long', seed = 42)
-
-# Read in the CSV with the spatial folds
 preppedCollection_wSpatialFolds = pd.read_csv(localPathToCVAssignedData)
-
-# Retain only the spatial fold column of blockcvsize
-preppedCollection_wSpatialFolds[cvFoldString_Spatial] = preppedCollection_wSpatialFolds['foldID_' + blockCVsize]
-preppedCollection_wSpatialFolds = preppedCollection_wSpatialFolds.drop(columns = [x for x in preppedCollection_wSpatialFolds.columns if 'foldID_' in x])
-
-# Write the CSV to disk 
-preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
 
 try:
     # try whether fcOI is present
