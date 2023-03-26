@@ -111,7 +111,7 @@ def get_prebObs(iteration):
         ]
 
     # List of the spatial predictors to use
-    spatial_preds = ['MEM1', 'MEM4', 'MEM6', 'MEM7', 'MEM8', 'MEM9', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM81']
+    spatial_preds = ['MEM1', 'MEM2', 'MEM4', 'MEM5', 'MEM7', 'MEM9', 'MEM12', 'MEM13', 'MEM17', 'MEM19', 'MEM21', 'MEM22', 'MEM23', 'MEM25', 'MEM26', 'MEM27', 'MEM28', 'MEM31', 'MEM32', 'MEM33', 'MEM34', 'MEM35', 'MEM36', 'MEM37', 'MEM39', 'MEM40', 'MEM41', 'MEM46', 'MEM49', 'MEM50', 'MEM51', 'MEM53', 'MEM55', 'MEM56', 'MEM57', 'MEM61', 'MEM64', 'MEM72', 'MEM73', 'MEM75', 'MEM77', 'MEM79', 'MEM85', 'MEM91', 'MEM95', 'MEM97', 'MEM99', 'MEM100', 'MEM108', 'MEM111', 'MEM114', 'MEM117', 'MEM132', 'MEM142', 'MEM172', 'MEM208', 'MEM224', 'MEM227', 'MEM231', 'MEM261', 'MEM272', 'MEM294', 'MEM308', 'MEM310', 'MEM331', 'MEM386']
     
     # Add the spatial predictors to the covariate list
     covariateList = covariateList + project_vars + spatial_preds[0:iteration]
@@ -123,8 +123,8 @@ def get_prebObs(iteration):
 
     classifier = ee.Classifier.smileRandomForest(
             numberOfTrees = 250,
-            variablesPerSplit = 6,
-            minLeafPopulation = 3,
+            variablesPerSplit = 10,
+            minLeafPopulation = 4,
             bagFraction = 0.632,
             seed = 42
             ).setOutputMode('REGRESSION')
@@ -184,5 +184,5 @@ if __name__ == '__main__':
 		with poolcontext(NPROC) as pool:
 				results = pool.map(get_prebObs, iterList)
 				results = pd.concat(results)
-				results.to_csv('spatial_predictors/'+today+'_predObs_forwardselected_spatialpredictors.csv')
+				results.to_csv('spatial_predictors/'+today+'_AM_predObs_forwardselected_spatialpredictors.csv')
 
