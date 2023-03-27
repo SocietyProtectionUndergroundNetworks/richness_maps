@@ -671,7 +671,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_spatialCV.csv', index=False)
+classDfSorted.to_csv('output/'+today+'_'+classProperty+'_grid_search_results.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
@@ -786,7 +786,7 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs_onehot.csv')
+predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
 #################################################################################################################################################################
 # Classify image
