@@ -135,7 +135,7 @@ def get_prebObs(iteration):
     fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_9/ectomycorrhizalwMEM/ectomycorrhizal_richness_training_data_wMEMs')
 
     classifier = ee.Classifier.smileRandomForest(
-            numberOfTrees = 250,
+            numberOfTrees = 10,
             variablesPerSplit = 12,
             minLeafPopulation = 4,
             bagFraction = 0.632,
@@ -178,7 +178,7 @@ def get_prebObs(iteration):
     predObs_wResiduals = predObs.map(lambda f: f.set('residuals', ee.Number(f.get(classProperty)).subtract(f.get(classProperty+'_Predicted'))))
 
     # Convert to pd
-    predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+    predObs_df = GEE_FC_to_pd(predObs_wResiduals.limit(1000))
 
     # Add number of spatial predictors to df
     predObs_df['number_of_spatialpredictors'] = iteration

@@ -25,7 +25,7 @@ ggplot() +
   #                      oob = scales::squish,
   #                      name = "myco_diveristy") +
   theme_minimal() +
-  theme(legend.position = "bottom",
+  theme(legend.position = "none",
         legend.box="horizontal",
         panel.grid = element_blank(),
         axis.title=element_blank(),
