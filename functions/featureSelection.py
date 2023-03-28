@@ -4,13 +4,12 @@ import math as m
 import time
 import numpy as np
 import pandas as pd
+import datetime
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SequentialFeatureSelector
-# from sklearn.pipeline import Pipeline
 from sklearn.model_selection import LeaveOneGroupOut
 # from sklearn.model_selection import StratifiedKFold
 # from sklearn.model_selection import PredefinedSplit
-# from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import ParameterGrid
 
@@ -18,12 +17,9 @@ from sklearn.model_selection import ParameterGrid
 randomNr = 42
 
 ### Setup the experiment name and the output directory
-varToModel = 'arbuscular_mycorrhizal_richness'
+varToModel = 'ectomycorrhizal_richness'
 today = '20230223'
-foldId = 'CV_Fold_Spatial'
-experiment = today + '_' + varToModel 
-if not os.path.exists('output/' + experiment):
-    os.mkdir('output/' + experiment)
+today = datetime.date.today().strftime("%Y%m%d")
 
 df = pd.read_csv('data/arbuscular_mycorrhizal_richness_training_data.csv')
 

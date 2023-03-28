@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA
 from itertools import combinations
 from itertools import repeat
 from functions.determineBlockSizeForCV import *
+from functions.EM_wMEM_grid_search import *
 
 ee.Initialize()
 
@@ -591,7 +592,7 @@ except Exception as e:
 fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
 # Define hyperparameters for grid search
-varsPerSplit_list = list(range(4,14,2))
+varsPerSplit_list = list(range(2,14,2))
 leafPop_list = list(range(2,14,2))
 
 classifierListRegression = []
@@ -710,16 +711,16 @@ except Exception as e:
     print('Moving on...')
 
 # Fetch FC from GEE
-grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListRegression]).flatten()
-classDfRegression = GEE_FC_to_pd(grid_search_resultsRegression)
+# grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListRegression]).flatten()
+# classDfRegression = GEE_FC_to_pd(grid_search_resultsRegression)
 grid_search_resultsClassification = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListClassification]).flatten()
 classDfClassification = GEE_FC_to_pd(grid_search_resultsClassification)
 
-grid_search_resultsRegression_export = ee.batch.Export.table.toAsset(
-    collection = grid_search_resultsRegression,
-    description = classProperty+'_Regression_grid_search_results',
-    assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
-grid_search_resultsRegression_export.start()
+# grid_search_resultsRegression_export = ee.batch.Export.table.toAsset(
+#     collection = grid_search_resultsRegression,
+#     description = classProperty+'_Regression_grid_search_results',
+#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
+# grid_search_resultsRegression_export.start()
 
 grid_search_resultsClassification_export = ee.batch.Export.table.toAsset(
     collection = grid_search_resultsClassification,
@@ -728,12 +729,12 @@ grid_search_resultsClassification_export = ee.batch.Export.table.toAsset(
 grid_search_resultsClassification_export.start()
 
 # Sort values
-classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
+# classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
 classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_zeroInflated_wMEM.csv', index=False)
-classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_zeroInflated_wMEM.csv', index=False)
+# classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_wMEM.csv', index=False)
+classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_wMEM.csv', index=False)
 
 # Get top model name
 bestModelNameRegression = grid_search_resultsRegression.limit(1, sort_acc_prop, False).first().get('cName')
