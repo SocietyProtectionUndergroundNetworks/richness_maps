@@ -1065,6 +1065,42 @@ coefOfVarImage = stdDevImage.divide(meanImage).rename('Bootstrapped_CoefOfVar')
 ##################################################################################################################################################################
 # Univariate int-ext analysis
 ##################################################################################################################################################################
+covariateList = [
+'CGIAR_PET',
+'CHELSA_BIO_Annual_Mean_Temperature',
+'CHELSA_BIO_Annual_Precipitation',
+'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
+'CHELSA_BIO_Precipitation_Seasonality',
+'ConsensusLandCover_Human_Development_Percentage',
+# 'ConsensusLandCoverClass_Barren',
+# 'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+# 'ConsensusLandCoverClass_Herbaceous_Vegetation',
+# 'ConsensusLandCoverClass_Mixed_Other_Trees',
+# 'ConsensusLandCoverClass_Shrubs',
+'EarthEnvTexture_CoOfVar_EVI',
+'EarthEnvTexture_Correlation_EVI',
+'EarthEnvTexture_Homogeneity_EVI',
+'EarthEnvTopoMed_AspectCosine',
+'EarthEnvTopoMed_AspectSine',
+'EarthEnvTopoMed_Elevation',
+'EarthEnvTopoMed_Slope',
+'EarthEnvTopoMed_TopoPositionIndex',
+'EsaCci_BurntAreasProbability',
+'GHS_Population_Density',
+'GlobBiomass_AboveGroundBiomass',
+# 'GlobPermafrost_PermafrostExtent',
+'MODIS_NPP',
+# 'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+'SG_Depth_to_bedrock',
+'SG_Sand_Content_005cm',
+'SG_SOC_Content_005cm',
+'SG_Soil_pH_H2O_005cm',
+]
+
+compositeToClassify = compositeToClassify.select(covariateList)
+
 # Create a feature collection with only the values from the image bands
 fcForMinMax = fcOI.select(covariateList)
 
@@ -1185,6 +1221,21 @@ def assessExtrapolation(fcOfInterest, propOfVariance):
 
 # PCA interpolation-extrapolation image
 PCA_int_ext = assessExtrapolation(preppedCollection[covariateList], propOfVariance).rename('PCA_pct_int_ext')
+
+# underExploredMaps = ee.Image.cat(
+#     univariate_int_ext_image.rename('univariate_pct_int_ext'),
+#     PCA_int_ext.rename('PCA_pct_int_ext'))
+# IntExtclassifiedImageExport = ee.batch.Export.image.toAsset(
+#     image = underExploredMaps.toFloat(),
+#     description = classProperty+'_IntExt',
+#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_IntExt',
+#     crs = 'EPSG:4326',
+#     crsTransform = '[0.08333333333333333,0,-180,0,-0.08333333333333333,90]',
+#     region = exportingGeometry,
+#     maxPixels = int(1e13),
+#     pyramidingPolicy = {".default": pyramidingPolicy}
+# )
+# IntExtclassifiedImageExport.start()
 
 ##################################################################################################################################################################
 # Final image export
