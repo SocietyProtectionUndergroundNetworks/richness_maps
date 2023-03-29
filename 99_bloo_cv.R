@@ -55,7 +55,7 @@ df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/SLOO_CV_AM.csv')
           summarise(lower = min(r2), upper = max(r2), mean = mean(r2)) %>% 
           mutate(Guild = 'Ectomycorrhizal'))
 
-df %>% 
+plot <- df %>% 
   ggplot(aes(x = buffer_size/1000, y = mean)) +
   geom_ribbon(aes(ymin = lower, ymax = upper, group = Guild), alpha = 0.2) +
   geom_line(aes(color = Guild)) +
@@ -66,6 +66,6 @@ df %>%
     strip.text.x = element_blank()
   ) +
   ylim(c(0, 0.6)) +
-  geom_hline(aes(yintercept = 0), linetype = 2) +
-  geom_smooth(aes(group = Guild), se = F, method = 'glm', formula = 'y ~ poly(x, 31)')
-
+  geom_hline(aes(yintercept = 0), linetype = 2) 
+plot
+ggsave(plot = plot, "bloo_cv.png")
