@@ -83,22 +83,26 @@ def calculate_shap_values(rep):
     LP = grid_search_results['cName'][rep].split('LP')[1].split('_')[0]
 
     hyperparameters = {
-        'n_estimators': 250,
+        'n_estimators': 25,
         'min_samples_split': int(LP),
         'max_features': int(VPS),
         'max_samples': 0.632,
         'random_state': 42
     }
 
+    # Create 
     classifier = RandomForestRegressor()
     classifier.set_params(**hyperparameters)
 
     classifier.fit(X, y)
 
     explainer = shap.TreeExplainer(classifier)
-    shap_values = explainer.shap_values(X)
-    return shap_values
 
+    shap_values = explainer(df[covariateList])
+
+    return shap_values.values
+
+# shap_values_list = [shap_values.values, shap_values.values, shap_values.values]
 
 @contextmanager
 def poolcontext(*args, **kwargs):
@@ -114,11 +118,24 @@ if __name__ == '__main__':
     with poolcontext(NPROC) as pool:
         shap_values_list = pool.map(calculate_shap_values, reps)
 
-        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
-                                    base_values=shap_values_list[0].base_values,
-                                    data=X,
-                                    feature_names=list(df.columns))
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230330_arbuscular_mycorrhizal_richness_shap_summary_plots.png', dpi=300)
 
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), plot_type = "bar", show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230330_arbuscular_mycorrhizal_richness_shap_featureImp_plots.png', dpi=300)
+
+
+        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
+                                    # base_values=shap_values_list[0].base_values,
+                                    data=pd.DataFrame(data=df, columns=covariateList),
+                                    feature_names=list(df.columns))
+        
         # Get the top 5 most important features
         importance = np.abs(explanation.values).mean(0)
         top_5 = np.argsort(-importance)[:6]
@@ -140,4 +157,4 @@ if __name__ == '__main__':
             shap.dependence_plot(X.columns[feature_idx], explanation.values, X, ax=axes[i // 3, i % 3], show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230329_arbuscular_mycorrhizal_richness_shap_dependence_plots.png', dpi=300)
+        plt.savefig('figures/20230330_arbuscular_mycorrhizal_richness_shap_dependence_plots.png', dpi=300)

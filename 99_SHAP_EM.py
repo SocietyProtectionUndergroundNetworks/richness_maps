@@ -104,8 +104,11 @@ def calculate_shap_values(rep):
     classifier.fit(X, y)
 
     explainer = shap.TreeExplainer(classifier)
-    shap_values = explainer.shap_values(X)
-    return shap_values, explainer.expected_value
+
+    shap_values = explainer(df[covariateList])
+
+    return shap_values.values
+
 
 @contextmanager
 def poolcontext(*args, **kwargs):
@@ -121,24 +124,37 @@ if __name__ == '__main__':
     with poolcontext(NPROC) as pool:
         shap_values_list = pool.map(calculate_shap_values, reps)
 
-        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
-                                    base_values=shap_values_list[0].base_values,
-                                    data=X,
-                                    feature_names=list(df.columns))
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_summary_plots.png', dpi=300)
 
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), plot_type = "bar", show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_featureImp_plots.png', dpi=300)
+
+
+        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
+                                    # base_values=shap_values_list[0].base_values,
+                                    data=pd.DataFrame(data=df, columns=covariateList),
+                                    feature_names=list(df.columns))
+        
         # Get the top 5 most important features
         importance = np.abs(explanation.values).mean(0)
         top_5 = np.argsort(-importance)[:6]
 
-        # column_names = {'ConsensusLandCover_Human_Development_Percentage': 'Human Development (%)',
-        #                 'SG_SOC_Content_005cm': 'SOC at 5cm (g/kg)',
-        #                 'CHELSA_BIO_Annual_Mean_Temperature': 'Annual Mean Temperature (°C)',
-        #                 'CGIAR_PET': 'Potential Evapotranspiration',
-        #                 'CHELSA_BIO_Max_Temperature_of_Warmest_Month': 'Max Temperature of Warmest Month',
-        #                 'CHELSA_BIO_Precipitation_Seasonality': 'Precipitation Seasonality'}
+        column_names = {'ConsensusLandCover_Human_Development_Percentage': 'Human Development (%)',
+                        'SG_SOC_Content_005cm': 'SOC at 5cm (g/kg)',
+                        'CHELSA_BIO_Annual_Mean_Temperature': 'Annual Mean Temperature (°C)',
+                        'CGIAR_PET': 'Potential Evapotranspiration',
+                        'CHELSA_BIO_Max_Temperature_of_Warmest_Month': 'Max Temperature of Warmest Month',
+                        'CHELSA_BIO_Precipitation_Seasonality': 'Precipitation Seasonality'}
 
-        # # Rename the columns in X using the dictionary
-        # X = X.rename(columns=column_names)
+        # Rename the columns in X using the dictionary
+        X = X.rename(columns=column_names)
 
         # Create a multipanelled figure of the top 5 features
         fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
@@ -147,4 +163,4 @@ if __name__ == '__main__':
             shap.dependence_plot(X.columns[feature_idx], explanation.values, X, ax=axes[i // 3, i % 3], show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230329_ectomycorrhizal_richness_shap_dependence_plots.png', dpi=300)
+        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_dependence_plots.png', dpi=300)
