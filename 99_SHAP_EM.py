@@ -128,13 +128,13 @@ if __name__ == '__main__':
         shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_summary_plots.png', dpi=300)
+        plt.savefig('figures/20230417_ectomycorrhizal_richness_shap_summary_plots.png', dpi=300)
 
         plt.figure()
         shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), plot_type = "bar", show = False, sort = True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_featureImp_plots.png', dpi=300)
+        plt.savefig('figures/20230417_ectomycorrhizal_richness_shap_featureImp_plots.png', dpi=300)
 
 
         explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
@@ -163,4 +163,4 @@ if __name__ == '__main__':
             shap.dependence_plot(X.columns[feature_idx], explanation.values, X, ax=axes[i // 3, i % 3], show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230330_ectomycorrhizal_richness_shap_dependence_plots.png', dpi=300)
+        plt.savefig('figures/20230417_ectomycorrhizal_richness_shap_dependence_plots.png', dpi=300)
