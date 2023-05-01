@@ -711,32 +711,9 @@ except Exception as e:
             
                 # Train the classifier with the collection
                 trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
-                
-                # Set reference level
-                fcOIforClassification = fcOI.map(lambda f: f.set('sequencing_platform454Roche', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sequencing_platformIllumina', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typerhizosphere_soil', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typesoil', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('sample_typetopsoil', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_AMV4_5NF_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_NS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAML1_AML2_then_nu_SSU_0595_5__nu_SSU_0948_3_', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5F_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersAMV4_5NF_AMDGR', 1)) # <- This is the reference level
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_AML2_then_NS31_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGeoA2_NS4_then_NS31_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A_and_GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersGlomerWT0_Glomer1536_then_NS31_AM1A__GlomerWT0_Glomer1536_then_NS31_AM1B', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AML1_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_AMV4_5NF_AMDGR', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS4_then_NS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS1_NS41_then_AML1_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AM1', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersNS31_AML2', 0))
-                fcOIforClassification = fcOIforClassification.map(lambda f: f.set('primersWANDA_AML2', 0))
 
                 # Classify the FC
-                classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
+                classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
                 return classifiedFC
 
