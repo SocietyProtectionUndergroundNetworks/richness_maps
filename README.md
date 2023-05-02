@@ -6,8 +6,8 @@ AM and ECM rarefied richness are obtained from [GlobalFungi](https://globalfungi
 
 ## Geospatial modeling
 The geospatial modeling approach is divided in several parts, with the respecitve scripts numbered accordingly.
-* 1 Covariate sampling. Here, we extract per-pixel environmental covariate data.
-* 2 Data filtering. Removing outliers per biome.
-* 3 One-hot encoding. Transforming the project-specific variables from multilevel categorical to binary format.
-* 4 Modeling pipeline. The actual modeling approach. 
+1. Covariate sampling. Here, we extract per-pixel environmental covariate data.
+2. Data filtering. Removing outliers per biome.
+3. One-hot encoding. Transforming the project-specific variables from multilevel categorical to binary format.
+4. Modeling pipeline. The actual modeling approach. 
 
