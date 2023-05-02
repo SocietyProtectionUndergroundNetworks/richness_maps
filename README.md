@@ -1,18 +1,13 @@
 # SPUN Fungal Richness maps
-This repository contains a versioned history of mycorrhizal richness predictions. 
+This repository contains code and data to reproduce the Arbuscular Mycorrhizal (AM) and Ectomycorrhizal (ECM) richness maps from Van Nuland et al. 202x doi: 10.xxx.xxx
 
-# February 4th 2023: Global Fungi Release 4, EM only
-<img style="float: right;" src="./output/ectomycorrhizal_richness_Predicted.png"/>
+## Rarefaction
+AM and ECM rarefied richness are obtained from [GlobalFungi](https://globalfungi.com/). Richness values are rarefied using the R package `iNEXT`. Code and data to reproduce this are found in the folder `xxx`
 
+## Geospatial modeling
+The geospatial modeling approach is divided in several parts, with the respecitve scripts numbered accordingly.
+* 1 Covariate sampling. Here, we extract per-pixel environmental covariate data.
+* 2 Data filtering. Removing outliers per biome.
+* 3 One-hot encoding. Transforming the project-specific variables from multilevel categorical to binary format.
+* 4 Modeling pipeline. The actual modeling approach. 
 
-
-
-## Version 1: GlobalFungi
-- Date: 26 November 2021
-- Source data: https://globalfungi.com/
-- Maps: AMF, EMF; all taxa
-
-## Version 2: Tedersoo
-- Date: 26 November 2021
-- Source data: https://link.springer.com/article/10.1007/s13225-021-00493-7
-- Maps: AMF, EMF, Ericoid; all taxa
