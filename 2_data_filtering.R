@@ -4,6 +4,8 @@ library(tidyverse)
 
 `%notin%` <- Negate(`%in%`)
 
+# ECM
+
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
 df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_EM_richness_rarefied_sampled.csv") %>% 
   mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
@@ -22,7 +24,6 @@ df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_EM_r
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 13, "Deserts")) %>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 14, "Mangroves"))
 
-# 
 metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/REL4_Colin_datasets_samples_metadata.csv')
 
 # Filter data:
@@ -75,7 +76,6 @@ filtered_data <- df %>%
   filter(sequencing_platform %notin% seq_platforms_toRemove) %>% 
   filter(primers %notin% primers_toRemove) %>% 
   filter(target_gene %notin% target_markers_toRemove)
-  
 
 # Write to file
 fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_sampled_outliersRemoved.csv')
@@ -140,3 +140,114 @@ ggplot() +
         axis.text=element_blank()) +
   guides(fill = guide_colorbar(title.position = "top"))
 
+
+# AM
+# Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled.csv") %>% 
+  mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 3, "Tropical Coniferous Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 4, "Temperate Broadleaf Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 5, "Temperate Conifer Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 6, "Boreal Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 7, "Tropical Grasslands")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 8, "Temperate Grasslands")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 9, "Flooded Grasslands")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 10, "Montane Grasslands")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 11, "Tundra")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 12, "Mediterranean Forests")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 13, "Deserts")) %>%
+# mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 14, "Mangroves"))
+
+metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/SSU_metadata.csv')
+
+# Filter data:
+# 1. Get mean and sd per guild per biome, but exclude Bissett and Yan papers
+# 2. Remove 
+
+# Get mean & IQR values
+summary <- df %>% 
+  left_join(metadata, by = c('sample_id' = 'id')) %>% 
+  group_by(Resolve_Biome) %>% 
+  summarise(n = n(), median = median(rarefied), iqr = IQR(rarefied)) %>% 
+  mutate(cutoff = median + 5 * iqr)
+
+# Statistics
+dropped_stats <- df %>%
+  left_join(summary, by = c("Resolve_Biome")) %>%
+  mutate(dropped = rarefied > cutoff) %>%
+  group_by(Resolve_Biome) %>%
+  summarise(n = mean(n), median = mean(median), iqr = mean(iqr), cutoff = mean(cutoff), n_dropped = sum(dropped))
+
+# Write to file
+fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230508_AM_SSU_outlier_removal_stats.csv')
+
+# Filter data
+filtered_data <- df %>% 
+  left_join(summary, by = c("Resolve_Biome")) %>%
+  filter(rarefied <= cutoff) %>%
+  mutate(Resolve_Biome = as.factor(Resolve_Biome)) 
+
+# Write to file
+fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230508_AM_SSU_sampled_outliersRemoved.csv')
+
+# Per biome boxplots
+filtered_data %>% 
+  ggplot(aes(x = Resolve_Biome, y = rarefied)) +
+  facet_wrap(vars(Resolve_Biome), scales = "free") +
+  geom_jitter(aes(color = Resolve_Biome), alpha = 0.25) +
+  geom_boxplot(fill = NA,  outlier.shape = NA) + 
+  theme(legend.position = 'none') 
+
+# Display data on map
+ggplot() +
+  geom_polygon(data = map_data("world"), 
+               aes(x = long, y = lat, group = group),
+               fill = "#bababa",
+               color = NA,
+               size = 0.1) + 
+  coord_fixed(1.1) +
+  geom_point(data = filtered_data %>% 
+               arrange(rarefied), 
+             aes(x = Pixel_Long, y = Pixel_Lat, fill = rarefied),
+             color = "black",
+             pch = 21
+  ) +
+  scale_fill_gradientn(colors = brewer.pal(8, "YlOrRd"),
+                       limits = c(0, 100),
+                       oob = scales::squish,
+                       name = "AM Richness Rarefied") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.box="horizontal",
+        panel.grid = element_blank(),
+        axis.title=element_blank(),
+        axis.text=element_blank()) +
+  guides(fill = guide_colorbar(title.position = "top"))
+
+# Display only filtered locations on map
+filtered <- df %>% filter(sample_id %notin% filtered_data$sample_id) %>% select(sample_id, rarefied, Resolve_Biome)
+ggplot() +
+  geom_polygon(data = map_data("world"), 
+               aes(x = long, y = lat, group = group),
+               fill = "#bababa",
+               color = NA,
+               size = 0.1) + 
+  coord_fixed(1.1) +
+  geom_point(data = df %>% filter(sample_id %notin% filtered_data$sample_id), 
+             aes(x = Pixel_Long, y = Pixel_Lat, fill = rarefied),
+             color = "black",
+             pch = 21
+  ) +
+  scale_fill_gradientn(colors = brewer.pal(8, "YlOrRd"),
+                       limits = c(0, 100),
+                       oob = scales::squish,
+                       name = "Outliers") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.box="horizontal",
+        panel.grid = element_blank(),
+        axis.title=element_blank(),
+        axis.text=element_blank()) +
+  guides(fill = guide_colorbar(title.position = "top"))

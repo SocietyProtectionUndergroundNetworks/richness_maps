@@ -33,7 +33,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_9/' + guild # + 'wMEM'
+projectFolder = '000_SPUN_GFv4_10/' + guild # + 'wMEM'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -488,7 +488,7 @@ else:
 # Data processing
 ####################################################################################################################################################################
 # Import raw data
-rawPointCollection = pd.read_csv('data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+rawPointCollection = pd.read_csv('data/20230508_AM_SSU_sampled_onehot_outliersRemoved.csv', float_precision='round_trip')
 print('Size of original Collection', rawPointCollection.shape[0])
 
 # Rename classification property column
