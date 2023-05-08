@@ -143,7 +143,7 @@ ggplot() +
 
 # AM
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
-df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled.csv") %>% 
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv") %>% 
   mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
@@ -190,7 +190,7 @@ filtered_data <- df %>%
   mutate(Resolve_Biome = as.factor(Resolve_Biome)) 
 
 # Write to file
-fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230508_AM_SSU_sampled_outliersRemoved.csv')
+fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230508_AM_SSU_sampled_onehot_outliersRemoved.csv')
 
 # Per biome boxplots
 filtered_data %>% 
