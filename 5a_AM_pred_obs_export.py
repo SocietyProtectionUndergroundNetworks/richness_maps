@@ -32,7 +32,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_9/' + guild
+projectFolder = '000_SPUN_GFv4_10/' + guild
 
 # Specify whether to use spatial or random CV
 spatialCV = False 
@@ -166,12 +166,7 @@ def addLatLon(f):
     lon = f.geometry().coordinates().get(0)
     return f.set(latString, lat).set(longString, lon)
 
-
-
 fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
-
-fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
-print(guild + ' hyperparameter tuning')
 
 # Define hyperparameters for grid search
 varsPerSplit_list = list(range(4,14,2))
@@ -273,4 +268,4 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/20230501_'+classProperty+'_pred_obs.csv')
+predObs_df.to_csv('output/20230510_'+classProperty+'_pred_obs.csv')

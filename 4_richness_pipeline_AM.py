@@ -700,7 +700,7 @@ except Exception as e:
             trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
             
             # Classify the FC
-            classifiedFC = fcOIforClassification.classify(trainedClassifier,classProperty+'_Predicted')
+            classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
             return classifiedFC
 
