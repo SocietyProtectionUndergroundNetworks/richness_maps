@@ -1278,7 +1278,7 @@ else:
 # !! This operaion SHOULD NOT be performed on the entire dataset
 
 # Define buffer sizes to test (in meters)
-buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000]
+buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000, 1500000, 2000000]
 
 # Set number of random points to test
 if preppedCollection.shape[0] > 1000:

@@ -97,13 +97,13 @@ def run_spatial_loo_cv(buffer_size, rep):
     classifier = RandomForestRegressor()
 
     # Read in the grid search results from GEE
-    grid_search_results = pd.read_csv('output/20230315_arbuscular_mycorrhizal_richness_grid_search_results_spatialCV.csv')
+    grid_search_results = pd.read_csv('output/20230508_arbuscular_mycorrhizal_richness_grid_search_results.csv')
     VPS = grid_search_results['cName'][rep].split('VPS')[1].split('_')[0]
     LP = grid_search_results['cName'][rep].split('LP')[1].split('_')[0]
  
     # Define the hyperparameters
     hyperparameters = {
-        'n_estimators': 25, # number of trees
+        'n_estimators': 250, # number of trees
         'min_samples_split': np.int(LP), # minLeafPopulation
         'max_features': np.int(VPS), # variablesPerSplit
         'max_samples': 0.632, # bagFraction
@@ -150,11 +150,11 @@ def poolcontext(*args, **kwargs):
 
 if __name__ == '__main__':
     # Define the list of buffer sizes to use 
-    buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000]
+    buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000, 1500000, 2000000]
     reps = list(range(0,10))
         # Define the list of buffer sizes to use
-    buffer_sizes = [10000, 250000, 1000000]
-    reps = list(range(0,3))
+    # buffer_sizes = [10000, 250000, 1000000]
+    # reps = list(range(0,3))
 
     NPROC = 72
     with poolcontext(NPROC) as pool:

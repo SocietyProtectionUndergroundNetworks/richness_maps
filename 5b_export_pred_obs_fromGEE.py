@@ -34,4 +34,4 @@ for i in [0,1, 5,7,8,9]:
     df = pd.concat([df, GEE_FC_to_pd(fc)])
 
 df = df.groupby('sample_id').mean().reset_index()
-df.to_csv('output/20230501_ectomycorrhizal_richness_pred_obs.csv', index = False)
+df.to_csv('output/20230531_ectomycorrhizal_richness_pred_obs.csv', index = False)
