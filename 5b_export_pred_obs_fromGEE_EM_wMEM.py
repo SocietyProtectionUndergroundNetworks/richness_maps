@@ -29,9 +29,9 @@ df = pd.DataFrame()
 
 # Import the data
 # for i in list(range(1,11)):
-for i in [0,1, 5,7,8,9]:
-    fc = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_9/ectomycorrhizal/ectomycorrhizal_richness_pred_obs_rep_'+str(i))
+for i in [0,1,3,5,6,8]:
+    fc = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_9/ectomycorrhizalwMEM/ectomycorrhizal_richness_pred_obs_rep_'+str(i))
     df = pd.concat([df, GEE_FC_to_pd(fc)])
 
 df = df.groupby('sample_id').mean().reset_index()
-df.to_csv('output/20230531_ectomycorrhizal_richness_pred_obs.csv', index = False)
+df.to_csv('output/20230531_ectomycorrhizal_wMEM_richness_pred_obs.csv', index = False)
