@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import shap
 from sklearn.ensemble import RandomForestRegressor
+from itertools import repeat, chain
 import matplotlib.pyplot as plt
 import multiprocessing
 from contextlib import contextmanager
@@ -11,7 +12,7 @@ classProperty = 'arbuscular_mycorrhizal_richness'
 df = pd.read_csv('data/arbuscular_mycorrhizal_richness_training_data.csv')
 
 # Variables to include in the model
-covariateList = [
+envCovariateList = [
 'CGIAR_PET',
 'CHELSA_BIO_Annual_Mean_Temperature',
 'CHELSA_BIO_Annual_Precipitation',
@@ -46,7 +47,7 @@ covariateList = [
 ]
 
 # Rename variables in covariateList to increase readability
-covariateListRenamed = [
+envCovariateListRenamed = [
     'Potential Evapotranspiration',
     'Annual Mean Temperature',
     'Annual Precipitation',
@@ -95,8 +96,15 @@ project_vars = [
 'primersWANDA_AML2',
 ]
 
+# Rename variables in df to increase readability
+column_names = dict(zip(envCovariateList, envCovariateListRenamed))
+df = df.rename(columns=column_names)
+
 # Create final list of covariates
-covariateList = covariateList + project_vars
+covariateList = envCovariateListRenamed + project_vars
+
+# Subset columns from df
+df = df[covariateList + [classProperty]]
 
 # Load data and labels
 X = df[covariateList]
@@ -128,12 +136,40 @@ def calculate_shap_values(rep):
 
     return shap_values.values
 
+# lambda function to revert dictionary
+revert_dict = lambda d: dict(chain(*[zip(val, repeat(key)) for key, val in d.items()]))
+     
+# function to group shap values by feature groups
+def grouped_shap(shap_vals, features, groups):
+    groupmap = revert_dict(groups)
+    shap_Tdf = pd.DataFrame(shap_vals, columns=pd.Index(features, name='features')).T
+    shap_Tdf['group'] = shap_Tdf.reset_index().features.map(groupmap).values
+    shap_grouped = shap_Tdf.groupby('group').sum().T
+    return shap_grouped
+
 # # Calculate SHAP values
 # shap_values_list = [shap_values.values, shap_values.values, shap_values.values]
 
 # # Calculate mean SHAP values
 # mean_shap_values = np.mean(shap_values_list, axis=0)
 
+# # Get renamed feature name for each feature in 'covariateList', return dictionary where key = renamed feature name and value = [original feature name]
+# feature_names_dict = dict(zip(envCovariateListRenamed, [[name] for name in envCovariateList]))
+
+# # Add 'project_vars' as group to 'feature_names_dict'
+# feature_names_dict.update({'project_vars': project_vars})
+
+# # Group SHAP values by feature groups
+# shap_grouped = grouped_shap(mean_shap_values, covariateList, feature_names_dict)
+
+# shap.summary_plot(shap_grouped.values, features=shap_grouped.columns)
+
+# # Plot
+# plt.figure()
+# shap.summary_plot(shap_grouped.values, pd.DataFrame(data = shap_grouped.values, columns = shap_grouped.columns), show=False, sort=True)
+# plt.xlabel('Mean absolute SHAP value')
+# plt.tight_layout()
+# plt.show()
 # # Sum 'project_vars' SHAP values together
 # project_shap_values = np.sum(mean_shap_values[:, len(covariateList) - len(project_vars):], axis=1).reshape(-1, 1)
 
@@ -163,6 +199,11 @@ def calculate_shap_values(rep):
 # plt.tight_layout()
 # plt.show()
 
+# Create a shap scatter plot
+# plt.figure()
+# shap.plots.scatter(other_shap_values[:,"CGIAR_PET"])
+# plt.tight_layout()
+# plt.show()
 
 @contextmanager
 def poolcontext(*args, **kwargs):
@@ -177,70 +218,83 @@ if __name__ == '__main__':
     reps = list(range(0, 10))
     with poolcontext(NPROC) as pool:
         shap_values_list = pool.map(calculate_shap_values, reps)
-        
-        # plt.figure()
-        # shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
-        # plt.xlabel('Mean absolute SHAP value')
-        # plt.tight_layout()
-        # plt.savefig('figures/20230330_arbuscular_mycorrhizal_richness_shap_summary_plots.png', dpi=300)
+
+        # Save SHAP values to file
+        np.savez('shap_values_AM.npz', *shap_values_list)
+
+        # Read SHAP values from file
+        with np.load('shap_values_AM.npz') as data:
+              shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
+
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
 
         # Calculate mean SHAP values
         mean_shap_values = np.mean(shap_values_list, axis=0)
 
-        # Sum 'project_vars' SHAP values together
-        project_shap_values = np.sum(mean_shap_values[:, len(covariateList) - len(project_vars):], axis=1).reshape(-1, 1)
+        # Get the indices of the features you want to drop
+        drop_indices = [i for i, feat in enumerate(covariateList) if feat in project_vars]
 
-        # Get SHAP values for environmental features
-        env_shap_values = mean_shap_values[:, :len(covariateList) - len(project_vars)]
+        # Create a mask where only the features not in project_vars are True
+        mask = np.ones(len(covariateList), dtype=bool)
+        mask[drop_indices] = False
 
-        # Combine 'project_vars' SHAP values with other features
-        combined_shap_values = np.hstack([env_shap_values, project_shap_values])
+        # Create a new dataframe without the features to drop
+        df_filtered = df[envCovariateListRenamed]
 
-        # Create new feature names list
-        new_feature_names = covariateListRenamed + ["project_vars"]
-
-        # Create a DataFrame for SHAP values
-        df_shap_values = pd.DataFrame(data=combined_shap_values, columns=new_feature_names)
+        # Filter the mean SHAP values
+        mean_shap_values_filtered = mean_shap_values[:, mask]
 
         # Plot
         plt.figure()
-        shap.summary_plot(combined_shap_values, df_shap_values, show=False, sort=True)
+        shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230616_arbuscular_mycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
-
-        # Plot
-        plt.figure()
-        shap.summary_plot(env_shap_values, pd.DataFrame(data = env_shap_values, columns = covariateListRenamed), show=False, sort=True)
-        plt.xlabel('Mean absolute SHAP value')
-        plt.tight_layout()
-        plt.savefig('figures/20230616_arbuscular_mycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
+        plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
 
         # Create a SHAP explanation object
-        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
-                                    # base_values=shap_values_list[0].base_values,
-                                    data=pd.DataFrame(data=df, columns=covariateList),
-                                    feature_names=list(df.columns))
-        
+        explanation = shap.Explanation(values = mean_shap_values_filtered,
+                                       data = X[envCovariateListRenamed])
+
         # Get the top 5 most important features
         importance = np.abs(explanation.values).mean(0)
-        top_5 = np.argsort(-importance)[:6]
+        top_6 = np.argsort(-importance)[:6]
 
-        column_names = {'ConsensusLandCover_Human_Development_Percentage': 'Human Development',
-                        'SG_SOC_Content_005cm': 'SOC at 5cm',
-                        'CHELSA_BIO_Annual_Mean_Temperature': 'Annual Mean Temperature',
-                        'CGIAR_PET': 'Potential Evapotranspiration',
-                        'CHELSA_BIO_Max_Temperature_of_Warmest_Month': 'Max Temperature of Warmest Month',
-                        'CHELSA_BIO_Precipitation_Seasonality': 'Precipitation Seasonality'}
+        # create a SHAP plot for each of the top 5 features
+        for i, idx in enumerate(top_6):
+            feature_name = envCovariateListRenamed[idx]
+            shap.plots.scatter(explanation, feature_name)
+            plt.tight_layout()
+            plt.show()
+            plt.savefig(f'figures/20230622_arbuscular_mycorrhizal_richness_shap_scatter_plot_{feature_name}.png', dpi=300)
 
-        # Rename the columns in X using the dictionary
-        X = X.rename(columns=column_names)
+        # # Get the top 6 most important features
+        # top_6_indices = np.argsort(-np.abs(mean_shap_values_filtered).mean(axis=0))[:6]
+        # top_6_features = np.array(envCovariateListRenamed)[top_6_indices]
+
+        # explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
+        #                     # base_values=shap_values_list[0].base_values,
+        #                     data=pd.DataFrame(data=df, columns=covariateList),
+        #                     feature_names=list(df.columns))
+        
+        explanation = shap.Explanation(values=mean_shap_values_filtered,
+                    # base_values=shap_values_list[0].base_values,
+                    data=pd.DataFrame(data=df[envCovariateListRenamed + [classProperty]], columns=envCovariateListRenamed + [classProperty]),
+                    feature_names=list(df[envCovariateListRenamed + [classProperty]].columns))
+       
+        # Get the top 6 most important features
+        importance = np.abs(explanation.values).mean(0)
+        top_6 = np.argsort(-importance)[:6]
 
         # Create a multipanelled figure of the top 5 features
         fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
 
-        for i, feature_idx in enumerate(top_5):
-            shap.dependence_plot(X.columns[feature_idx], explanation.values, X, ax=axes[i // 3, i % 3], show=False)
+        for i, feature_idx in enumerate(top_6):
+            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = None, show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230616_arbuscular_mycorrhizal_richness_shap_dependence_plots.png', dpi=300)
+        plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_scatter_plots.png', dpi=300)
+

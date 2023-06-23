@@ -108,7 +108,7 @@ covariateList = covariateList + project_vars
 # Load data and labels
 X = df[covariateList]
 y = df[classProperty]
-rep = 1
+
 # Train Random Forest models and calculate SHAP values
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
@@ -148,6 +148,7 @@ NPROC = 10
 if __name__ == '__main__':
     reps = list(range(0, 10))
     with poolcontext(NPROC) as pool:
+        # Calculate SHAP values, returns a list of arrays
         shap_values_list = pool.map(calculate_shap_values, reps)
 
         # Calculate mean SHAP values
