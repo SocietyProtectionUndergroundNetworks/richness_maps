@@ -235,7 +235,7 @@ if __name__ == '__main__':
         # Calculate mean SHAP values
         mean_shap_values = np.mean(shap_values_list, axis=0)
 
-        # Get the indices of the features you want to drop
+        # Get the indices of the features to drop
         drop_indices = [i for i, feat in enumerate(covariateList) if feat in project_vars]
 
         # Create a mask where only the features not in project_vars are True
@@ -248,38 +248,14 @@ if __name__ == '__main__':
         # Filter the mean SHAP values
         mean_shap_values_filtered = mean_shap_values[:, mask]
 
-        # Plot
+        # Plot and save figure to file
         plt.figure()
         shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
         plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
 
-        # Create a SHAP explanation object
-        explanation = shap.Explanation(values = mean_shap_values_filtered,
-                                       data = X[envCovariateListRenamed])
-
-        # Get the top 5 most important features
-        importance = np.abs(explanation.values).mean(0)
-        top_6 = np.argsort(-importance)[:6]
-
-        # create a SHAP plot for each of the top 5 features
-        for i, idx in enumerate(top_6):
-            feature_name = envCovariateListRenamed[idx]
-            shap.plots.scatter(explanation, feature_name)
-            plt.tight_layout()
-            plt.show()
-            plt.savefig(f'figures/20230622_arbuscular_mycorrhizal_richness_shap_scatter_plot_{feature_name}.png', dpi=300)
-
-        # # Get the top 6 most important features
-        # top_6_indices = np.argsort(-np.abs(mean_shap_values_filtered).mean(axis=0))[:6]
-        # top_6_features = np.array(envCovariateListRenamed)[top_6_indices]
-
-        # explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
-        #                     # base_values=shap_values_list[0].base_values,
-        #                     data=pd.DataFrame(data=df, columns=covariateList),
-        #                     feature_names=list(df.columns))
-        
+        # Create SHAP explanation object        
         explanation = shap.Explanation(values=mean_shap_values_filtered,
                     # base_values=shap_values_list[0].base_values,
                     data=pd.DataFrame(data=df[envCovariateListRenamed + [classProperty]], columns=envCovariateListRenamed + [classProperty]),
@@ -289,12 +265,14 @@ if __name__ == '__main__':
         importance = np.abs(explanation.values).mean(0)
         top_6 = np.argsort(-importance)[:6]
 
-        # Create a multipanelled figure of the top 5 features
+        # Create a multipanelled figure of the top 6 features
         fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
 
+        # Plot
         for i, feature_idx in enumerate(top_6):
-            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = None, show=False)
+            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = 'auto', show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_scatter_plots.png', dpi=300)
+        # Save figure to file
+        plt.savefig('figures/20230622_arbuscular_mycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
 

@@ -11,7 +11,7 @@ classProperty = 'ectomycorrhizal_richness'
 df = pd.read_csv('data/ectomycorrhizal_richness_training_data.csv')
 
 # Variables to include in the model
-covariateList = [
+envCovariateList = [
 'CGIAR_PET',
 'CHELSA_BIO_Annual_Mean_Temperature',
 'CHELSA_BIO_Annual_Precipitation',
@@ -46,7 +46,7 @@ covariateList = [
 ]
 
 # Rename variables in covariateList to increase readability
-covariateListRenamed = [
+envCovariateListRenamed = [
     'Potential Evapotranspiration',
     'Annual Mean Temperature',
     'Annual Precipitation',
@@ -102,14 +102,20 @@ project_vars = [
 'primersITS9MUNngs_ITS4ngsUni',
 ]
 
+# Rename variables in df to increase readability
+column_names = dict(zip(envCovariateList, envCovariateListRenamed))
+df = df.rename(columns=column_names)
+
 # Create final list of covariates
-covariateList = covariateList + project_vars
+covariateList = envCovariateListRenamed + project_vars
+
+# Subset columns from df
+df = df[covariateList + [classProperty]]
 
 # Load data and labels
 X = df[covariateList]
 y = df[classProperty]
 
-# Train Random Forest models and calculate SHAP values
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
     grid_search_results = pd.read_csv('output/20230328_ectomycorrhizal_richness_grid_search_results_Regression_zeroInflated.csv')
@@ -150,21 +156,55 @@ if __name__ == '__main__':
     with poolcontext(NPROC) as pool:
         # Calculate SHAP values, returns a list of arrays
         shap_values_list = pool.map(calculate_shap_values, reps)
+        
+        # Save SHAP values to file
+        np.savez('shap_values_AM.npz', *shap_values_list)
+
+        # Read SHAP values from file
+        with np.load('shap_values_AM.npz') as data:
+              shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
+
+        plt.figure()
+        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230626_ectomycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
 
         # Calculate mean SHAP values
         mean_shap_values = np.mean(shap_values_list, axis=0)
 
+        # Get the indices of the features to drop
+        drop_indices = [i for i, feat in enumerate(covariateList) if feat in project_vars]
+
+        # Create a mask where only the features not in project_vars are True
+        mask = np.ones(len(covariateList), dtype=bool)
+        mask[drop_indices] = False
+
+        # Create a new dataframe without the features to drop
+        df_filtered = df[envCovariateListRenamed]
+
+        # Filter the mean SHAP values
+        mean_shap_values_filtered = mean_shap_values[:, mask]
+
+        # Plot and save figure to file
+        plt.figure()
+        shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
+        plt.xlabel('Mean absolute SHAP value')
+        plt.tight_layout()
+        plt.savefig('figures/20230626_ectomycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
+
+        # Create plot where project_vars are grouped together
         # Sum 'project_vars' SHAP values together
         project_shap_values = np.sum(mean_shap_values[:, len(covariateList) - len(project_vars):], axis=1).reshape(-1, 1)
 
-        # Get SHAP values for environmental features
-        env_shap_values = mean_shap_values[:, :len(covariateList) - len(project_vars)]
+        # Get SHAP values for other features
+        other_shap_values = mean_shap_values[:, :len(covariateList) - len(project_vars)]
 
         # Combine 'project_vars' SHAP values with other features
-        combined_shap_values = np.hstack([env_shap_values, project_shap_values])
+        combined_shap_values = np.hstack([other_shap_values, project_shap_values])
 
         # Create new feature names list
-        new_feature_names = covariateListRenamed + ["project_vars"]
+        new_feature_names = envCovariateListRenamed + ["project_vars"]
 
         # Create a DataFrame for SHAP values
         df_shap_values = pd.DataFrame(data=combined_shap_values, columns=new_feature_names)
@@ -174,38 +214,27 @@ if __name__ == '__main__':
         shap.summary_plot(combined_shap_values, df_shap_values, show=False, sort=True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230616_ectomycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
+        plt.show()
+        # plt.savefig('figures/20230626_ectomycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
 
-        # Plot
-        plt.figure()
-        shap.summary_plot(env_shap_values, pd.DataFrame(data = env_shap_values, columns = covariateListRenamed), show=False, sort=True)
-        plt.xlabel('Mean absolute SHAP value')
-        plt.tight_layout()
-        plt.savefig('figures/20230616_ectomycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
-        explanation = shap.Explanation(values=np.mean(shap_values_list, axis=0),
-                                    # base_values=shap_values_list[0].base_values,
-                                    data=pd.DataFrame(data=df, columns=covariateList),
-                                    feature_names=list(df.columns))
-        
-        # Get the top 5 most important features
+        # Create SHAP explanation object        
+        explanation = shap.Explanation(values=mean_shap_values_filtered,
+                    # base_values=shap_values_list[0].base_values,
+                    data=pd.DataFrame(data=df[envCovariateListRenamed + [classProperty]], columns=envCovariateListRenamed + [classProperty]),
+                    feature_names=list(df[envCovariateListRenamed + [classProperty]].columns))
+       
+        # Get the top 6 most important features
         importance = np.abs(explanation.values).mean(0)
-        top_5 = np.argsort(-importance)[:6]
+        top_6 = np.argsort(-importance)[:6]
 
-        column_names = {'ConsensusLandCover_Human_Development_Percentage': 'Human Development (%)',
-                        'SG_SOC_Content_005cm': 'SOC at 5cm (g/kg)',
-                        'CHELSA_BIO_Annual_Mean_Temperature': 'Annual Mean Temperature (°C)',
-                        'CGIAR_PET': 'Potential Evapotranspiration',
-                        'CHELSA_BIO_Max_Temperature_of_Warmest_Month': 'Max Temperature of Warmest Month',
-                        'CHELSA_BIO_Precipitation_Seasonality': 'Precipitation Seasonality'}
-
-        # Rename the columns in X using the dictionary
-        X = X.rename(columns=column_names)
-
-        # Create a multipanelled figure of the top 5 features
+        # Create a multipanelled figure of the top 6 features
         fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
 
-        for i, feature_idx in enumerate(top_5):
-            shap.dependence_plot(X.columns[feature_idx], explanation.values, X, ax=axes[i // 3, i % 3], show=False)
+        # Plot
+        for i, feature_idx in enumerate(top_6):
+            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = 'auto', show=False)
             plt.tight_layout()
 
-        plt.savefig('figures/20230616_ectomycorrhizal_richness_shap_dependence_plots.png', dpi=300)
+        # Save figure to file
+        plt.savefig('figures/20230626_ectomycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
+
