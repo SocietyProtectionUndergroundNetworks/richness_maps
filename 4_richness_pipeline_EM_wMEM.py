@@ -729,11 +729,11 @@ grid_search_resultsClassification_export = ee.batch.Export.table.toAsset(
 grid_search_resultsClassification_export.start()
 
 # Sort values
-# classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
+classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
 classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-# classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_wMEM.csv', index=False)
+classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_wMEM.csv', index=False)
 classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_wMEM.csv', index=False)
 
 # Get top model name
