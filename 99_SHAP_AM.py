@@ -168,7 +168,7 @@ if __name__ == '__main__':
         shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230626_arbuscular_mycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
+        plt.savefig('figures/20230816_arbuscular_mycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
 
         # Plot 2: SHAP summary plot, with project_vars removed
         # Calculate mean SHAP values
@@ -192,7 +192,7 @@ if __name__ == '__main__':
         shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230626_arbuscular_mycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
+        plt.savefig('figures/20230816_arbuscular_mycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
 
         # Plot 3: SHAP summary plot, with project_vars grouped together
         # Sum 'project_vars' SHAP values together
@@ -215,7 +215,7 @@ if __name__ == '__main__':
         shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, sort=True, show = False)
         plt.xlabel('Mean absolute SHAP value')
         plt.tight_layout()
-        plt.savefig('figures/20230626_arbuscular_mycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
+        plt.savefig('figures/20230816_arbuscular_mycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
 
         # Plot 4: SHAP dependence plots for the top 6 features
         # Create SHAP explanation object        
@@ -237,7 +237,7 @@ if __name__ == '__main__':
             plt.tight_layout()
 
         # Save figure to file
-        plt.savefig('figures/20230626_arbuscular_mycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
+        plt.savefig('figures/202307816_arbuscular_mycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
 
         # Plot 5: SHAP dependence plots for the top 6 features, without interaction
         # Create a multipanelled figure of the top 6 features
@@ -249,4 +249,4 @@ if __name__ == '__main__':
             plt.tight_layout()
 
         # Save figure to file
-        plt.savefig('figures/20230626_arbuscular_mycorrhizal_richness_shap_scatter_plots.png', dpi=300)
+        plt.savefig('figures/20230816_arbuscular_mycorrhizal_richness_shap_scatter_plots.png', dpi=300)
