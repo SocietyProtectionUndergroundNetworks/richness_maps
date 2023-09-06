@@ -17,7 +17,7 @@ main <- function(tpoints, modeldomain = NULL, ppoints = NULL,
   path_random_pos <- which(args == '--path_random')
   # tpoints_pos <- which(args == '--tpoints')
   modeldomain_pos <- which(args == '--modeldomain')
-  # ppoints_pos <- which(arges == '--ppoints')
+  ppoints_pos <- which(args == '--ppoints')
   k_pos <- which(args == '--k')
   maxp_pos <- which(args == '--maxp')
   clustering_pos <- which(args == '--clustering')
@@ -29,7 +29,7 @@ main <- function(tpoints, modeldomain = NULL, ppoints = NULL,
   # path_random <- args[path_random_pos+1]
   # tpoints <- args[tpoints_pos+1]
   modeldomain <- args[modeldomain_pos+1]
-  # ppoints <- args[ppoints_pos+1]
+  ppoints <- args[ppoints_pos+1]
   k <- as.numeric(args[k_pos+1])
   maxp <- as.numeric(args[maxp_pos+1])
   clustering <- args[clustering_pos+1]
@@ -43,7 +43,8 @@ main <- function(tpoints, modeldomain = NULL, ppoints = NULL,
              crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
 
   # Load random data as proxy for model domain, convert to sf
-  ppoints <- fread('richness_maps/data/filtered_randomPoints.csv') %>% 
+  ppoints <- fread(ppoints) %>% 
+    filter(!is.na(Pixel_Lat)) %>% 
     st_as_sf(., coords = c("Pixel_Long", "Pixel_Lat"),
              crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
             

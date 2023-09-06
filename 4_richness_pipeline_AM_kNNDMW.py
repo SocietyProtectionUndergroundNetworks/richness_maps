@@ -543,6 +543,7 @@ except Exception as e:
     # Generate folds with knndm function
     R_call = ["/Library/Frameworks/R.framework/Resources/bin/Rscript functions/generateFoldsKNNDM.R " + \
             "--path_training " + localPathToCVAssignedData + " " + \
+            "--ppoints " + "data/filtered_randomPoints_AMF.csv " + \
             "--k 10 " + \
             "--maxp 0.5 " + \
             "--clustering hierarchical " + \
@@ -1278,31 +1279,31 @@ FinalImageExport.start()
 
 print('Map exports started! Moving on...')
 
-# ##################################################################################################################################################################
-# # Spatial Leave-One-Out cross validation
-# ##################################################################################################################################################################
-# assetIDToCreate_Folder = 'users/'+usernameFolderString+'/'+projectFolder+'/sloo_cv'
-# if any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
-#     pass
-# else:
-#     # perform the folder creation
-#     print(assetIDToCreate_Folder,'being created...')
+##################################################################################################################################################################
+# Spatial Leave-One-Out cross validation
+##################################################################################################################################################################
+assetIDToCreate_Folder = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv'
+if any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
+    pass
+else:
+    # perform the folder creation
+    print(assetIDToCreate_Folder,'being created...')
 
-#     # Create the folder within Earth Engine
-#     subprocess.run(bashCommandList_CreateFolder+[assetIDToCreate_Folder])
-#     while any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
-#         print('Waiting for asset to be created...')
-#         time.sleep(normalWaitTime)
-#     print('Asset created!')
+    # Create the folder within Earth Engine
+    subprocess.run(bashCommandList_CreateFolder+[assetIDToCreate_Folder])
+    while any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
+        print('Waiting for asset to be created...')
+        time.sleep(normalWaitTime)
+    print('Asset created!')
 
-#     # Sleep to allow the server time to receive incoming requests
-#     time.sleep(normalWaitTime/2)
+    # Sleep to allow the server time to receive incoming requests
+    time.sleep(normalWaitTime/2)
 
-# # !! NOTE: this is a fairly computatinally intensive excercise, so there are some precautions to take to ensure servers aren't overloaded
-# # !! This operaion SHOULD NOT be performed on the entire dataset
+# !! NOTE: this is a fairly computatinally intensive excercise, so there are some precautions to take to ensure servers aren't overloaded
+# !! This operaion SHOULD NOT be performed on the entire dataset
 
-# # Define buffer sizes to test (in meters)
-# buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000, 1500000, 2000000]
+# Define buffer sizes to test (in meters)
+buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000, 1500000, 2000000]
 
 # # Set number of random points to test
 # if preppedCollection.shape[0] > 1000:
@@ -1310,112 +1311,118 @@ print('Map exports started! Moving on...')
 # else:
 #     n_points = preppedCollection.shape[0]
 
-# # Set number of repetitions
-# n_reps = 10
-# nList = list(range(0,n_reps))
+# Set number of repetitions
+n_reps = 10
+nList = list(range(0,n_reps))
 
-# # Perform BLOO-CV
-# for buffer in buffer_sizes:
-#     mapList = []
-#     for item in nList:
-#         mapList = mapList + (list(zip([buffer], repeat(item))))
+fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_10/arbuscular_mycorrhizal_KNNDMW/arbuscular_mycorrhizal_richness_training_data')
 
-#     # Make a feature collection from the buffer sizes list
-#     fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
+n_points = 1000
 
-#     grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
-  
-#     # Get top model name
-#     bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
+for rep in nList:
+    # Perform BLOO-CV
+    for buffer in buffer_sizes:
+        # mapList = []
+        # for item in nList:
+        #     mapList = mapList + (list(zip([buffer], repeat(item))))
 
-#     # Get top 10 models
-#     top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
+        # Make a feature collection from the buffer sizes list
+        # fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
+        fc_toMap = ee.FeatureCollection(ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',buffer).set('rep',rep))
 
-#     # Helper function 1: assess whether point is within sampled range
-#     def WithinRange(f):
-#         testFeature = f
-#         # Training FeatureCollection: all samples not within geometry of test feature
-#         trainFC = fcOI.filter(ee.Filter.geometry(f.geometry()).Not())
+        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
+    
+        # Get top model name
+        bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
 
-#         # Make a FC with the band names
-#         fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
+        # Get top 10 models
+        top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
-#         # Helper function 1b: assess whether training point is within sampled range; per band
-#         def getRange(f):
-#             bandBeingComputed = f.get('BandName')
-#             minValue = trainFC.aggregate_min(bandBeingComputed)
-#             maxValue = trainFC.aggregate_max(bandBeingComputed)
-#             testFeatureWithinRange = ee.Number(testFeature.get(bandBeingComputed)).gte(ee.Number(minValue)).bitwiseAnd(ee.Number(testFeature.get(bandBeingComputed)).lte(ee.Number(maxValue)))
-#             return f.set('within_range', testFeatureWithinRange)
+        # Helper function 1: assess whether point is within sampled range
+        def WithinRange(f):
+            testFeature = f
+            # Training FeatureCollection: all samples not within geometry of test feature
+            trainFC = fcOI.filter(ee.Filter.geometry(f.geometry()).Not())
 
-#         # Return value of 1 if all bands are within sampled range
-#         within_range = fcWithBandNames.map(getRange).aggregate_min('within_range')
+            # Make a FC with the band names
+            fcWithBandNames = ee.FeatureCollection(ee.List(covariateList).map(lambda bandName: ee.Feature(None).set('BandName',bandName)))
 
-#         return f.set('within_range', within_range)
+            # Helper function 1b: assess whether training point is within sampled range; per band
+            def getRange(f):
+                bandBeingComputed = f.get('BandName')
+                minValue = trainFC.aggregate_min(bandBeingComputed)
+                maxValue = trainFC.aggregate_max(bandBeingComputed)
+                testFeatureWithinRange = ee.Number(testFeature.get(bandBeingComputed)).gte(ee.Number(minValue)).bitwiseAnd(ee.Number(testFeature.get(bandBeingComputed)).lte(ee.Number(maxValue)))
+                return f.set('within_range', testFeatureWithinRange)
 
-#     # Helper function 1: Spatial Leave One Out cross-validation function:
-#     def BLOOcv(f):
-#         rep = f.get('rep')
-#         # Test feature
-#         testFeature = ee.FeatureCollection(f)
+            # Return value of 1 if all bands are within sampled range
+            within_range = fcWithBandNames.map(getRange).aggregate_min('within_range')
 
-#         # Training set: all samples not within geometry of test feature
-#         trainFC = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.geometry(testFeature).Not())
+            return f.set('within_range', within_range)
 
-#         # Classifier to test: same hyperparameter settings as from grid search procedure
-#         classifierName = top_10Models.get(rep)
-#         classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+        # Helper function 1: Spatial Leave One Out cross-validation function:
+        def BLOOcv(f):
+            rep = f.get('rep')
+            # Test feature
+            testFeature = ee.FeatureCollection(f)
 
-#         # Train classifier
-#         trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
+            # Training set: all samples not within geometry of test feature
+            trainFC = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.geometry(testFeature).Not())
 
-#         # Apply classifier
-#         classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
+            # Classifier to test: same hyperparameter settings as from grid search procedure
+            classifierName = top_10Models.get(rep)
+            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-#         # Get predicted value
-#         predicted = classified.first().get('predicted')
+            # Train classifier
+            trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
 
-#         # Set predicted value to feature
-#         return f.set('predicted', predicted).copyProperties(f)
+            # Apply classifier
+            classified = testFeature.classify(classifier = trainedClassifer, outputName = 'predicted')
 
-#     # Helper function 2: R2 calculation function
-#     def calc_R2(f):
-#         rep = f.get('rep')
-#         # FeatureCollection holding the buffer radius
-#         buffer_size = f.get('buffer_size')
+            # Get predicted value
+            predicted = classified.first().get('predicted')
 
-#         # Sample 1000 validation points from the data
-#         fc_withRandom = fcOI.randomColumn(seed = rep)
-#         subsetData = fc_withRandom.sort('random').limit(n_points)
+            # Set predicted value to feature
+            return f.set('predicted', predicted).copyProperties(f)
 
-#         # Add the iteration ID to the FC
-#         fc_toValidate = subsetData.map(lambda f: f.set('rep', rep))
+        # Helper function 2: R2 calculation function
+        def calc_R2(f):
+            rep = f.get('rep')
+            # FeatureCollection holding the buffer radius
+            buffer_size = f.get('buffer_size')
 
-#         # Add the buffer around the validation data
-#         fc_wBuffer = fc_toValidate.map(lambda f: f.buffer(buffer_size))
+            # Sample 1000 validation points from the data
+            fc_withRandom = fcOI.randomColumn(seed = rep)
+            subsetData = fc_withRandom.sort('random').limit(n_points)
 
-#         # Remove points not within sampled range
-#         fc_withinSampledRange = fc_wBuffer.map(WithinRange).filter(ee.Filter.eq('within_range', 1))
+            # Add the iteration ID to the FC
+            fc_toValidate = subsetData.map(lambda f: f.set('rep', rep))
 
-#         # Apply blocked leave one out CV function
-#         # predicted = fc_withinSampledRange.map(BLOOcv)
-#         predicted = fc_wBuffer.map(BLOOcv)
+            # Add the buffer around the validation data
+            fc_wBuffer = fc_toValidate.map(lambda f: f.buffer(buffer_size))
 
-#         # Calculate R2 value
-#         R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
+            # Remove points not within sampled range
+            fc_withinSampledRange = fc_wBuffer.map(WithinRange).filter(ee.Filter.eq('within_range', 1))
 
-#         return(f.set('R2_val', R2_val))
+            # Apply blocked leave one out CV function
+            # predicted = fc_withinSampledRange.map(BLOOcv)
+            predicted = fc_wBuffer.map(BLOOcv)
 
-#     # Calculate R2 across range of buffer sizes
-#     sloo_cv = fc_toMap.map(calc_R2)
+            # Calculate R2 value
+            R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
 
-#     # Export FC to assets
-#     bloo_cv_fc_export = ee.batch.Export.table.toAsset(
-#         collection = sloo_cv,
-#         description = classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer),
-#         assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/sloo_cv/'+classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer)
-#     )
+            return(f.set('R2_val', R2_val))
 
-#     bloo_cv_fc_export.start()
+        # Calculate R2 across range of buffer sizes
+        sloo_cv = fc_toMap.map(calc_R2)
+
+        # Export FC to assets
+        bloo_cv_fc_export = ee.batch.Export.table.toAsset(
+            collection = sloo_cv,
+            description = classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer),
+            assetId = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv/'+classProperty+'_sloo_cv_results_wExtrapolation_'+str(buffer)+'_rep_'+str(rep),
+        )
+
+        bloo_cv_fc_export.start()
 
 # print('Blocked Leave-One-Out started! Moving on...')

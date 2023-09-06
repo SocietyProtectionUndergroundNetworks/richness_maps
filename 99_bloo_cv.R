@@ -1,7 +1,8 @@
 library(data.table)
 library(tidyverse)
 
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/SLOO_CV_AM.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/arbuscular_mycorrhizal_sloo_cv_results_wExtrapolation.csv') %>% 
+  rename(r2 = R2_val) %>% 
   group_by(buffer_size) %>% 
   summarise(lower = min(r2), upper = max(r2), mean = mean(r2))
 
@@ -18,11 +19,8 @@ df %>%
   ylim(c(0, 0.6)) +
   geom_hline(aes(yintercept = 0), linetype = 2)
 
-
-library(data.table)
-library(tidyverse)
-
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/SLOO_CV_EM.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/ectomycorrhizal_sloo_cv_results_wExtrapolation.csv') %>% 
+  rename(r2 = R2_val) %>% 
   group_by(buffer_size) %>% 
   summarise(lower = min(r2), upper = max(r2), mean = mean(r2))
 
@@ -39,18 +37,13 @@ df %>%
   ylim(c(0, 0.6)) +
   geom_hline(aes(yintercept = 0), linetype = 2)
 
-
-
-
-
-library(data.table)
-library(tidyverse)
-
-df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/SLOO_CV_AM.csv') %>% 
+df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/arbuscular_mycorrhizal_sloo_cv_results_wExtrapolation.csv') %>% 
+  rename(r2 = R2_val) %>% 
   group_by(buffer_size) %>% 
   summarise(lower = min(r2), upper = max(r2), mean = mean(r2)) %>% 
   mutate(Guild = 'Arbuscular Mycorrhizal') %>% 
-  rbind(., fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/SLOO_CV_EM.csv') %>% 
+  rbind(., fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/ectomycorrhizal_sloo_cv_results_wExtrapolation.csv') %>% 
+  rename(r2 = R2_val) %>% 
           group_by(buffer_size) %>% 
           summarise(lower = min(r2), upper = max(r2), mean = mean(r2)) %>% 
           mutate(Guild = 'Ectomycorrhizal'))
