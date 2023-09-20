@@ -1,4 +1,5 @@
 library(data.table)
+library(ggpmisc)
 library(tidyverse)
 
 df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/arbuscular_mycorrhizal_sloo_cv_results_wExtrapolation.csv') %>% 
@@ -49,15 +50,14 @@ df <- fread('/Users/johanvandenhoogen/SPUN/richness_maps/output/arbuscular_mycor
           mutate(Guild = 'Ectomycorrhizal'))
 
 
-library(ggpmisc)
 
-eq_fmt <- "`y`~`=`~%.3g~italic(e)^{%.3g~`x`}"
+# eq_fmt <- "`y`~`=`~%.3g~italic(e)^{%.3g~`x`}"
 eq_fmt <- "`y`~`=`~`%.3g + %.3g log(x)`"
 
-plot <- df %>% 
+df %>% 
   ggplot(aes(x = buffer_size/1000, y = mean, group = Guild)) +
-  # geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
-  # geom_line(aes(color = Guild)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper, fill = Guild), alpha = 0.1) +
+  geom_line(aes(color = Guild)) +
   ylab("Coefficient of Determination R2") + xlab("Buffer Size (km)") +
   theme_classic() +
   theme(
@@ -70,7 +70,9 @@ plot <- df %>%
   geom_smooth(method = 'lm',
               formula = 'y ~ log(x)',
               aes(color = Guild),
-              se = FALSE) +
+              se = FALSE,
+              size = 0.75,
+              linetype = 'dashed') +
   stat_poly_eq(mapping = aes(x = buffer_size/1000, y = mean, group = Guild,
                              label = sprintf(eq_fmt,
                                              after_stat(b_0),
@@ -79,11 +81,3 @@ plot <- df %>%
                output.type = "numeric",
                parse = TRUE
   ) 
-plot
-
-
-
-
-
-
-

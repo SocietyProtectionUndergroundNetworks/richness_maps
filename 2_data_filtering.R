@@ -45,6 +45,10 @@ dropped_stats <- df %>%
   group_by(Resolve_Biome, guild) %>%
   summarise(n = mean(n), median = mean(median), iqr = mean(iqr), cutoff = mean(cutoff), n_dropped = sum(dropped))
 
+dropped_poitns <- df %>%
+  left_join(summary_woBissetYan, by = c("Resolve_Biome", "guild")) %>%
+  filter(rarefied > cutoff)
+
 # Write to file
 fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230203_GFv4_outlier_removal_stats.csv')
 
@@ -131,7 +135,7 @@ ggplot() +
   scale_fill_gradientn(colors = brewer.pal(8, "YlOrRd"),
                        limits = c(0, 500),
                        oob = scales::squish,
-                       name = "Outliers") +
+                       name = "EM Richness Rarefied (Outliers)") +
   theme_minimal() +
   theme(legend.position = "bottom",
         legend.box="horizontal",
@@ -139,7 +143,6 @@ ggplot() +
         axis.title=element_blank(),
         axis.text=element_blank()) +
   guides(fill = guide_colorbar(title.position = "top"))
-
 
 # AM
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
@@ -243,7 +246,7 @@ ggplot() +
   scale_fill_gradientn(colors = brewer.pal(8, "YlOrRd"),
                        limits = c(0, 100),
                        oob = scales::squish,
-                       name = "Outliers") +
+                       name = "AM Richness Rarefied (Outliers)") +
   theme_minimal() +
   theme(legend.position = "bottom",
         legend.box="horizontal",

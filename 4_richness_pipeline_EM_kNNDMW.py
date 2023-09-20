@@ -473,7 +473,7 @@ try:
     fcOI = ee.FeatureCollection(assetIDForCVAssignedColl)
     print(fcOI.size().getInfo(), 'features in', assetIDForCVAssignedColl)
 
-    preppedCollection = pd.read_csv(holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv')
+    preppedCollection_wSpatialFolds = pd.read_csv(holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv')
 
 except Exception as e:
     # Import raw data
@@ -753,94 +753,94 @@ top_10ModelsClassification = grid_search_resultsClassification.limit(10, 'Mean_o
 
 print('Moving on...')
 
-##################################################################################################################################################################
-# Predicted - Observed
-##################################################################################################################################################################
-fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+# ##################################################################################################################################################################
+# # Predicted - Observed
+# ##################################################################################################################################################################
+# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
-try:
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-    predObs_wResiduals.size().getInfo()
+# try:
+#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#     predObs_wResiduals.size().getInfo()
 
-except Exception as e:
-    for n in list(range(0,10)):
-        modelNameRegression = top_10ModelsRegression.get(n)
-        modelNameClassification = top_10ModelsClassification.get(n)
+# except Exception as e:
+#     for n in list(range(0,10)):
+#         modelNameRegression = top_10ModelsRegression.get(n)
+#         modelNameClassification = top_10ModelsClassification.get(n)
 
-        # Load the best model from the classifier list
-        classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
-        classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+#         # Load the best model from the classifier list
+#         classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+#         classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
 
-        # Train the classifier with the collection
-        # REGRESSION
-        fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
-        trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+#         # Train the classifier with the collection
+#         # REGRESSION
+#         fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
+#         trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
-        # Classification
-        fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
-        trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+#         # Classification
+#         fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+#         trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
-        # Classify the FC
-        def classifyFunction(f):
-            classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
-            classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
+#         # Classify the FC
+#         def classifyFunction(f):
+#             classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
+#             classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
 
-            featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
+#             featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
 
-            # Calculate final predicted value as product of classification and regression
-            featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
-            return featureToReturn
+#             # Calculate final predicted value as product of classification and regression
+#             featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
+#             return featureToReturn
 
-        # Classify fcOI
-        predObs = fcOI.map(classifyFunction)
+#         # Classify fcOI
+#         predObs = fcOI.map(classifyFunction)
 
-        # Add coordinates to FC
-        predObs = predObs.map(addLatLon)
+#         # Add coordinates to FC
+#         predObs = predObs.map(addLatLon)
 
-        # back-log transform predicted and observed values
-        if log_transform_classProperty == True:
-            predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-            predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
-            predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
+#         # back-log transform predicted and observed values
+#         if log_transform_classProperty == True:
+#             predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+#             predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+#             predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
 
-        # Add residuals to FC
-        predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+#         # Add residuals to FC
+#         predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
 
-        # Export to Assets
-        predObsexport = ee.batch.Export.table.toAsset(
-            collection = predObs_wResiduals,
-            description = classProperty+'_pred_obs_rep_'+str(n),
-            assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)
-        )
-        predObsexport.start()
+#         # Export to Assets
+#         predObsexport = ee.batch.Export.table.toAsset(
+#             collection = predObs_wResiduals,
+#             description = classProperty+'_pred_obs_rep_'+str(n),
+#             assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)
+#         )
+#         predObsexport.start()
 
-    # !! Break and wait
-    count = 1
-    while count >= 1:
-        taskList = [str(i) for i in ee.batch.Task.list()]
-        subsetList = [s for s in taskList if classProperty in s]
-        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-        count = len(subsubList)
-        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
-        time.sleep(normalWaitTime)
-    print('Moving on...')
+#     # !! Break and wait
+#     count = 1
+#     while count >= 1:
+#         taskList = [str(i) for i in ee.batch.Task.list()]
+#         subsetList = [s for s in taskList if classProperty in s]
+#         subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+#         count = len(subsubList)
+#         print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+#         time.sleep(normalWaitTime)
+#     print('Moving on...')
 
-    predObsList = []
-    for n in list(range(0,10)):
-        predObs = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-        predObsList.append(predObs)
+#     predObsList = []
+#     for n in list(range(0,10)):
+#         predObs = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#         predObsList.append(predObs)
 
-    predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
+#     predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
         
-# Convert to pd
-predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+# # Convert to pd
+# predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
-# Group by sample ID to return mean across ensemble prediction
-predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+# # Group by sample ID to return mean across ensemble prediction
+# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
+# predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
-print('Predicted Observed done, moving on...')
+# print('Predicted Observed done, moving on...')
 
 #################################################################################################################################################################
 # Classify image
@@ -1007,61 +1007,61 @@ predictedImage = regressedImage.multiply(classifiedImage).rename(classProperty+'
 
 ensemblePredictedImage = ee.Image.cat(regressedImage, classifiedImage, predictedImage)
 
-##################################################################################################################################################################
-# Variable importance metrics
-##################################################################################################################################################################
-if ensemble == False:
-    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
+# ##################################################################################################################################################################
+# # Variable importance metrics
+# ##################################################################################################################################################################
+# if ensemble == False:
+#     classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', bestModelNameRegression).first()).get('c'))
 
-    # Train the classifier with the collection
-    trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+#     # Train the classifier with the collection
+#     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-    # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-    featureImportances = trainedClassifer.explain().get('importance').getInfo()
+#     # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+#     featureImportances = trainedClassifer.explain().get('importance').getInfo()
 
-    featureImportances = pd.DataFrame(featureImportances.items(),
-                                        columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-                                                                                                ascending=False)
+#     featureImportances = pd.DataFrame(featureImportances.items(),
+#                                         columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+#                                                                                                 ascending=False)
 
-    # Scale values
-    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
-    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
+#     # Scale values
+#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
+#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
 
-if ensemble == True:
-    # Instantiate empty dataframe
-    featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
+# if ensemble == True:
+#     # Instantiate empty dataframe
+#     featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
 
-    for i in list(range(0,10)):
-        classifierName = top_10ModelsRegression.get(i)
-        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+#     for i in list(range(0,10)):
+#         classifierName = top_10ModelsRegression.get(i)
+#         classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-        # Train the classifier with the collection
-        trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+#         # Train the classifier with the collection
+#         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-        # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-        featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
-        featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
-                                            columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-                                                                                                    ascending=False)
-        # Scale values
-        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
-        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
+#         # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+#         featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
+#         featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
+#                                             columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+#                                                                                                     ascending=False)
+#         # Scale values
+#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
+#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
 
-        featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
+#         featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
 
-    featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
+#     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
-# Write to csv
-featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
-featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
+# # Write to csv
+# featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+# featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
 
-# Create and save plot
-plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
-                                title='Feature Importances')
-fig = plt.get_figure()
-fig.savefig('output/'+today+'_'+classProperty+'_featureImportances.png', bbox_inches='tight')
+# # Create and save plot
+# plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
+#                                 title='Feature Importances')
+# fig = plt.get_figure()
+# fig.savefig('output/'+today+'_'+classProperty+'_featureImportances.png', bbox_inches='tight')
 
-print('Variable importance metrics complete! Moving on...')
+# print('Variable importance metrics complete! Moving on...')
 
 ##################################################################################################################################################################
 # Bootstrapping
@@ -1227,9 +1227,9 @@ minDict = ee.Dictionary.fromLists(covariateList,minValuesWNulls)
 minImage = minDict.toImage()
 maxImage = maxDict.toImage()
 
-totalBandsBinary = compositeToClassify.gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
+totalBandsBinary = compositeToClassify.select(covariateList).gte(minImage.select(covariateList)).lt(maxImage.select(covariateList))
 univariate_int_ext_image = totalBandsBinary.reduce('sum').divide(compositeToClassify.bandNames().length()).rename('univariate_pct_int_ext')
-
+univariate_int_ext_image.bandNames().getInfo()
 ##################################################################################################################################################################
 # Multivariate (PCA) int-ext analysis
 ##################################################################################################################################################################
@@ -1250,7 +1250,7 @@ def assessExtrapolation(fcOfInterest, propOfVariance):
     bandNames = list(meanVector.index)
     meanImage = ee.Image(meanList).rename(bandNames)
     stdImage = ee.Image(stdList).rename(bandNames)
-    standardizedImage = compositeToClassify.subtract(meanImage).divide(stdImage)
+    standardizedImage = compositeToClassify.select(covariateList).subtract(meanImage).divide(stdImage)
 
     # Run a PCA on the point samples
     pcaOutput = PCA()
@@ -1523,6 +1523,6 @@ for rep in nList:
             assetId = 'projects/crowtherlab/johan/SPUN/EM_sloo_cv/'+classProperty+'_sloo_cv_results_wExtrapolation_'+str(buffer)+'_rep_'+str(rep),
         )
 
-        bloo_cv_fc_export.start()
+        # bloo_cv_fc_export.start()
 
     print('Blocked Leave-One-Out started! Moving on...')
