@@ -1,3 +1,4 @@
+rm(list=ls())
 library(RColorBrewer)
 library(data.table)
 library(tidyverse)
@@ -7,7 +8,7 @@ library(tidyverse)
 # ECM
 
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
-df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_EM_richness_rarefied_sampled.csv") %>% 
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230920_EM_richness_rarefied_sampled.csv") %>% 
   mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
@@ -34,23 +35,23 @@ metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/REL4_Col
 summary_woBissetYan <- df %>% 
   left_join(metadata, by = c('sample_id' = 'sample_ID')) %>% 
   filter(paper_id %notin% c('Bissett_AAAA_2016', 'Yan_2018_A0B2')) %>% 
-  group_by(Resolve_Biome, guild) %>% 
+  group_by(Resolve_Biome) %>% 
   summarise(n = n(), median = median(rarefied), iqr = IQR(rarefied)) %>% 
   mutate(cutoff = median + 5 * iqr)
 
 # Statistics
 dropped_stats <- df %>%
-  left_join(summary_woBissetYan, by = c("Resolve_Biome", "guild")) %>%
+  left_join(summary_woBissetYan, by = c("Resolve_Biome")) %>%
   mutate(dropped = rarefied > cutoff) %>%
-  group_by(Resolve_Biome, guild) %>%
+  group_by(Resolve_Biome) %>%
   summarise(n = mean(n), median = mean(median), iqr = mean(iqr), cutoff = mean(cutoff), n_dropped = sum(dropped))
 
-dropped_poitns <- df %>%
-  left_join(summary_woBissetYan, by = c("Resolve_Biome", "guild")) %>%
+dropped_points <- df %>%
+  left_join(summary_woBissetYan, by = c("Resolve_Biome")) %>%
   filter(rarefied > cutoff)
 
 # Write to file
-fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230203_GFv4_outlier_removal_stats.csv')
+fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230920_EM_outlier_removal_stats.csv')
 
 # primers/seq platforms/markers to remove
 seq_platforms_toRemove = "DNBSEQ-G400"
@@ -74,7 +75,7 @@ target_markers_toRemove = "ITS1"
 
 # Filter data
 filtered_data <- df %>% 
-  left_join(summary_woBissetYan, by = c("Resolve_Biome", "guild")) %>%
+  left_join(summary_woBissetYan, by = c("Resolve_Biome")) %>%
   filter(rarefied <= cutoff) %>%
   mutate(Resolve_Biome = as.factor(Resolve_Biome)) %>% 
   filter(sequencing_platform %notin% seq_platforms_toRemove) %>% 
@@ -82,11 +83,11 @@ filtered_data <- df %>%
   filter(target_gene %notin% target_markers_toRemove)
 
 # Write to file
-fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230203_GFv4_sampled_outliersRemoved.csv')
+fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230920_EM_sampled_outliersRemoved.csv')
 
 # Per biome boxplots
 filtered_data %>% 
-  ggplot(aes(x = guild, y = rarefied)) +
+  ggplot(aes(x = Resolve_Biome, y = rarefied)) +
   facet_wrap(vars(Resolve_Biome), scales = "free") +
   geom_jitter(aes(color = Resolve_Biome), alpha = 0.25) +
   geom_boxplot(fill = NA,  outlier.shape = NA) + 
