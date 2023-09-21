@@ -34,7 +34,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_10/' + guild + '_KNNDMW'
+projectFolder = '000_SPUN_GFv4_10/' + guild + '_guildsFixed'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -477,8 +477,7 @@ try:
 
 except Exception as e:
     # Import raw data
-    # Outliers removed (performed in R using 20230203_data_filtering.R)
-    rawPointCollection = pd.read_csv('data/20230203_GFv4_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20230920_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
@@ -740,8 +739,8 @@ classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascendi
 classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_kNNDMW.csv', index=False)
-classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_kNNDMW.csv', index=False)
+classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_kNNDMW_guildsFixed.csv', index=False)
+classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_kNNDMW_guildsFixed.csv', index=False)
 
 # Get top model name
 bestModelNameRegression = grid_search_resultsRegression.limit(1, sort_acc_prop, False).first().get('cName')
