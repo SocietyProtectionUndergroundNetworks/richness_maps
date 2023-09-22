@@ -124,7 +124,7 @@ y = df[classProperty]
 
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
-    grid_search_results = pd.read_csv('output/20230328_ectomycorrhizal_richness_grid_search_results_Regression_zeroInflated.csv')
+    grid_search_results = pd.read_csv('output/20230922_ectomycorrhizal_richness_grid_search_results_Regression_kNNDMW_guildsFixed99.csv')
     VPS = int(grid_search_results['cName'][rep].split('VPS')[1].split('_')[0])
     LP = int(grid_search_results['cName'][rep].split('LP')[1].split('_')[0])
 
