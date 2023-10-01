@@ -95,7 +95,7 @@ covariateList = compositeToUse.bandNames().getInfo()
 compositeToUse = gapFillAndExtendBounds(compositeToUse)
 
 # FeatureCollection to sample
-points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_10/20230919_EM_richness_rarefied")
+points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_10/20231001_EM_richness_rarefied")
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']
@@ -210,4 +210,4 @@ if __name__ == '__main__':
 						partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
 						range(0, size))
 				results = pd.concat(results)
-				results.to_csv("data/20230920_EM_richness_rarefied_sampled.csv")
+				results.to_csv("data/20231001_EM_richness_rarefied_sampled.csv")

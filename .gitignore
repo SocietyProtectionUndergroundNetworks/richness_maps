@@ -13,3 +13,4 @@ data/ectomycorrhizal_richness_bootstrapSamples_wMEM.csv
 .RData
 shap_values_EM_MEM_fasttree.npz
 data/20230920_EM_richness_rarefied_sampled.csv
+*.csv
