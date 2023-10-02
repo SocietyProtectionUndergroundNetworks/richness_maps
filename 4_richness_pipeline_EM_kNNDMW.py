@@ -477,7 +477,7 @@ try:
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20230920_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20231001_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
