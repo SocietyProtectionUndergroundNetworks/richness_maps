@@ -51,7 +51,7 @@ dropped_points <- df %>%
   filter(rarefied > cutoff)
 
 # Write to file
-# fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230920_EM_outlier_removal_stats.csv')
+# fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/2023101_EM_outlier_removal_stats.csv')
 
 # primers/seq platforms/markers to remove
 seq_platforms_toRemove = "DNBSEQ-G400"
