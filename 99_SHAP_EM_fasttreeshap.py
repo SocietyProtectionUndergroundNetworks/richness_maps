@@ -147,112 +147,117 @@ def calculate_shap_values(rep):
 
     return shap_values.values
 
-@contextmanager
-def poolcontext(*args, **kwargs):
-		"""This just makes the multiprocessing easier with a generator."""
-		pool = multiprocessing.Pool(*args, **kwargs)
-		yield pool
-		pool.terminate()
+with np.load('shap_values_EM_fasttree.npz') as data:
+    shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
 
-NPROC = 7
+# Calculate mean SHAP values
+mean_shap_values = np.mean(shap_values_list, axis=0)
+mean_shap_values.shape
+# Plot 1: SHAP summary plot, with all features
+plt.figure()
+shap.summary_plot(mean_shap_values, pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
+plt.xlabel('Mean absolute SHAP value')
+plt.tight_layout()
+# plt.show()
+plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
 
-if __name__ == '__main__':
-    reps = list(range(0, 10))
-    with poolcontext(NPROC) as pool:
-        # # Calculate SHAP values, returns a list of arrays
-        # shap_values_list = pool.map(calculate_shap_values, reps)
-        
-        # # Save SHAP values to file
-        # np.savez('shap_values_EM_fasttree.npz', *shap_values_list)
+# Plot 2: SHAP summary plot, with project_vars removed
+# Get the indices of the features to drop
+drop_indices = [i for i, feat in enumerate(covariateList) if feat in project_vars]
 
-        # Read SHAP values from file
-        with np.load('shap_values_EM_fasttree.npz') as data:
-              shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
+# Create a mask where only the features not in project_vars are True
+mask = np.ones(len(covariateList), dtype=bool)
+mask[drop_indices] = False
 
-        # Plot 1: SHAP summary plot, with all features
-        plt.figure()
-        shap.summary_plot(np.mean(shap_values_list, axis=0), pd.DataFrame(data=df, columns=covariateList), show = False, sort = True)
-        plt.xlabel('Mean absolute SHAP value')
-        plt.tight_layout()
-        plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_full.png', dpi=300)
+# Create a new dataframe without the features to drop
+df_filtered = df[envCovariateListRenamed]
 
-        # Plot 2: SHAP summary plot, with project_vars removed
-        # Calculate mean SHAP values
-        mean_shap_values = np.mean(shap_values_list, axis=0)
+# Filter the mean SHAP values
+mean_shap_values_filtered = mean_shap_values[:, mask]
 
-        # Get the indices of the features to drop
-        drop_indices = [i for i, feat in enumerate(covariateList) if feat in project_vars]
+# Plot and save figure to file
+plt.figure()
+shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
+plt.xlabel('Mean absolute SHAP value')
+plt.tight_layout()
+# plt.show()
+plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
 
-        # Create a mask where only the features not in project_vars are True
-        mask = np.ones(len(covariateList), dtype=bool)
-        mask[drop_indices] = False
+# Plot 3: SHAP summary plot, with project_vars grouped together
+# Sum 'project_vars' SHAP values together
+project_shap_values = np.sum(mean_shap_values[:, len(covariateList) - len(project_vars):], axis=1).reshape(-1, 1)
 
-        # Create a new dataframe without the features to drop
-        df_filtered = df[envCovariateListRenamed]
+# Get SHAP values for other features
+other_shap_values = mean_shap_values[:, :len(covariateList) - len(project_vars)]
 
-        # Filter the mean SHAP values
-        mean_shap_values_filtered = mean_shap_values[:, mask]
+# Combine 'project_vars' SHAP values with other features
+combined_shap_values = np.hstack([other_shap_values, project_shap_values])
 
-        # Plot and save figure to file
-        plt.figure()
-        shap.summary_plot(mean_shap_values_filtered, df_filtered, show=False, sort=True)
-        plt.xlabel('Mean absolute SHAP value')
-        plt.tight_layout()
-        plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_projectRemoved.png', dpi=300)
+# Create new feature names list
+new_feature_names = envCovariateListRenamed + ["project_vars"]
 
-        # Plot 3: SHAP summary plot, with project_vars grouped together
-        # Sum 'project_vars' SHAP values together
-        project_shap_values = np.sum(mean_shap_values[:, len(covariateList) - len(project_vars):], axis=1).reshape(-1, 1)
+# Create a df where project vars are Nan
+df_project_vars_grouped = df[envCovariateListRenamed]
+df_project_vars_grouped.loc[:, 'Project Variables'] = np.NaN
 
-        # Get SHAP values for other features
-        other_shap_values = mean_shap_values[:, :len(covariateList) - len(project_vars)]
+plt.figure()
+shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, sort=True, show = False)
+plt.xlabel('Mean absolute SHAP value')
+plt.tight_layout()
+plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
 
-        # Combine 'project_vars' SHAP values with other features
-        combined_shap_values = np.hstack([other_shap_values, project_shap_values])
+# Plot 4: SHAP dependence plots for the top 6 features
+# Create SHAP explanation object        
+explanation = shap.Explanation(values=mean_shap_values_filtered,
+            # base_values=shap_values_list[0].base_values,
+            data=pd.DataFrame(data=df[envCovariateListRenamed + [classProperty]], columns=envCovariateListRenamed + [classProperty]),
+            feature_names=list(df[envCovariateListRenamed + [classProperty]].columns))
 
-        # Create new feature names list
-        new_feature_names = envCovariateListRenamed + ["project_vars"]
+# Get the top 6 most important features
+importance = np.abs(explanation.values).mean(0)
+top_6 = np.argsort(-importance)[:6]
 
-        # Create a df where project vars are Nan
-        df_project_vars_grouped = df[envCovariateListRenamed]
-        df_project_vars_grouped.loc[:, 'Project Variables'] = np.NaN
+# Create a multipanelled figure of the top 6 features
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
 
-        plt.figure()
-        shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, sort=True, show = False)
-        plt.xlabel('Mean absolute SHAP value')
-        plt.tight_layout()
-        plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_summary_plots_projectGrouped.png', dpi=300)
+# Plot
+for i, feature_idx in enumerate(top_6):
+    shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = 'auto', show=False)
+    plt.tight_layout()
 
-        # Plot 4: SHAP dependence plots for the top 6 features
-        # Create SHAP explanation object        
-        explanation = shap.Explanation(values=mean_shap_values_filtered,
-                    # base_values=shap_values_list[0].base_values,
-                    data=pd.DataFrame(data=df[envCovariateListRenamed + [classProperty]], columns=envCovariateListRenamed + [classProperty]),
-                    feature_names=list(df[envCovariateListRenamed + [classProperty]].columns))
-       
-        # Get the top 6 most important features
-        importance = np.abs(explanation.values).mean(0)
-        top_6 = np.argsort(-importance)[:6]
+# Save figure to file
+plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
 
-        # Create a multipanelled figure of the top 6 features
-        fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
+# Plot 5: SHAP dependence plots for the top 6 features, without interaction
+# Create a multipanelled figure of the top 6 features
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
 
-        # Plot
-        for i, feature_idx in enumerate(top_6):
-            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = 'auto', show=False)
-            plt.tight_layout()
+# Plots without interaction
+for i, feature_idx in enumerate(top_6):
+    shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = None, show=False)
+    plt.tight_layout()
 
-        # Save figure to file
-        plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_scatter_plots_wInteraction.png', dpi=300)
+# Save figure to file
+plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_scatter_plots.png', dpi=300)
 
-        # Plot 5: SHAP dependence plots for the top 6 features, without interaction
-        # Create a multipanelled figure of the top 6 features
-        fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
+# Plot 6: SHAP bar plot for the top 12 features, with project_vars grouped together
+plt.figure()
+shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, plot_type = 'bar', sort=True, show = False, max_display=12)
+plt.xlabel('Mean absolute SHAP value')
+plt.tight_layout()
+plt.show()
+plt.savefig('figures/20240118_ectomycorrhizal_richness_shap_bar_plots_projectGrouped.png', dpi=300)
 
-        # Plots without interaction
-        for i, feature_idx in enumerate(top_6):
-            shap.dependence_plot(envCovariateListRenamed[feature_idx], explanation.values, X[envCovariateListRenamed], ax=axes[i // 3, i % 3], interaction_index = None, show=False)
-            plt.tight_layout()
+mean_shap_values = np.mean(np.abs(combined_shap_values), axis=0)
 
-        # Save figure to file
-        plt.savefig('figures/20230922_ectomycorrhizal_richness_shap_scatter_plots.png', dpi=300)
+# Create a DataFrame with feature names from df_project_vars_grouped and their corresponding mean SHAP values
+df_mean_shap_values = pd.DataFrame({
+    'Feature': df_project_vars_grouped.columns,
+    'Mean SHAP Value': mean_shap_values
+})
+
+# Sort by absolute mean SHAP value
+df_mean_shap_values = df_mean_shap_values.reindex(df_mean_shap_values['Mean SHAP Value'].sort_values(ascending=False).index)
+
+# Write to file
+df_mean_shap_values.to_csv('output/20240118_ectomycorrhizal_richness_mean_shap_values.csv', index=False)
