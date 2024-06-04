@@ -609,7 +609,7 @@ for vps in varsPerSplit_list:
         model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + '_REGRESSION'
 
         rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
-        numberOfTrees = 100,
+        numberOfTrees = nTrees,
         variablesPerSplit = vps,
         minLeafPopulation = lp,
         bagFraction = 0.632,
@@ -739,7 +739,7 @@ classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascendi
 # classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_kNNDMW_guildsFixed_rwr.csv', index=False)
+classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_kNNDMW_guildsFixed.csv', index=False)
 # classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_kNNDMW_guildsFixed.csv', index=False)
 
 # Get top model name
