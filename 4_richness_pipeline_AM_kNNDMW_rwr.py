@@ -696,7 +696,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+classProperty+'_grid_search_results_kNNDMW_rwr.csv', index=False)
+classDfSorted.to_csv('output/AMF_'+classProperty+'_grid_search_results_kNNDMW_rwr.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
