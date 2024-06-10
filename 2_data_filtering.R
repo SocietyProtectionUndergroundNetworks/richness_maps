@@ -8,7 +8,8 @@ library(tidyverse)
 # ECM
 
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
-df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20231001_EM_richness_rarefied_sampled.csv") %>% 
+# df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20231001_EM_richness_rarefied_sampled.csv") %>% 
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20240610_ECM_richness_rarefied_sampled.csv") %>% 
   mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
@@ -27,13 +28,12 @@ df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20231001_EM_richne
 
 metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/REL4_Colin_datasets_samples_metadata.csv')
 
-# Filter data:
 # 1. Get mean and sd per guild per biome, but exclude Bissett and Yan papers
 # 2. Remove 
 
 # Get mean & IQR values
 summary_woBissetYan <- df %>% 
-  left_join(metadata, by = c('sample_id' = 'sample_ID')) %>% 
+  left_join(metadata, by = c('sample_ID' = 'sample_ID')) %>% 
   filter(paper_id %notin% c('Bissett_AAAA_2016', 'Yan_2018_A0B2')) %>% 
   group_by(Resolve_Biome) %>% 
   summarise(n = n(), median = median(rarefied), iqr = IQR(rarefied)) %>% 
@@ -51,7 +51,7 @@ dropped_points <- df %>%
   filter(rarefied > cutoff)
 
 # Write to file
-# fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/2023101_EM_outlier_removal_stats.csv')
+# fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20240610_ECM_outlier_removal_stats.csv')
 
 # primers/seq platforms/markers to remove
 seq_platforms_toRemove = "DNBSEQ-G400"
@@ -78,12 +78,13 @@ filtered_data <- df %>%
   left_join(summary_woBissetYan, by = c("Resolve_Biome")) %>%
   filter(rarefied <= cutoff) %>%
   mutate(Resolve_Biome = as.factor(Resolve_Biome)) %>% 
+  left_join(metadata, by = c('sample_ID' = 'sample_ID')) %>% 
   filter(sequencing_platform %notin% seq_platforms_toRemove) %>% 
   filter(primers %notin% primers_toRemove) %>% 
   filter(target_gene %notin% target_markers_toRemove)
 
 # Write to file
-fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20231001_EM_sampled_outliersRemoved.csv')
+fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20240610_ECM_sampled_outliersRemoved.csv')
 
 # Per biome boxplots
 filtered_data %>% 
@@ -147,7 +148,7 @@ ggplot() +
 
 # AM
 # Load data, rename biome names when writing per-biome summary file. Uncomment to retain integers (necessary for mapping)
-df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20230206_GFv4_AM_richness_rarefied_sampled_oneHot.csv") %>% 
+df <- fread("/Users/johanvandenhoogen/SPUN/richness_maps/data/20240610_AMF_richness_rarefied_sampled.csv") %>% 
   mutate(Resolve_Biome = as.integer(Resolve_Biome)) #%>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 1, "Tropical Moist Forests")) %>%
 # mutate(Resolve_Biome = replace(Resolve_Biome, Resolve_Biome == 2, "Tropical Dry Forests")) %>%
@@ -172,7 +173,7 @@ metadata <- fread('/Users/johanvandenhoogen/SPUN/richness_pipeline/data/SSU_meta
 
 # Get mean & IQR values
 summary <- df %>% 
-  left_join(metadata, by = c('sample_id' = 'id')) %>% 
+  left_join(metadata, by = c('sample_ID' = 'id')) %>% 
   group_by(Resolve_Biome) %>% 
   summarise(n = n(), median = median(rarefied), iqr = IQR(rarefied)) %>% 
   mutate(cutoff = median + 5 * iqr)
@@ -185,16 +186,17 @@ dropped_stats <- df %>%
   summarise(n = mean(n), median = mean(median), iqr = mean(iqr), cutoff = mean(cutoff), n_dropped = sum(dropped))
 
 # Write to file
-fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230508_AM_SSU_outlier_removal_stats.csv')
+# fwrite(dropped_stats, '/Users/johanvandenhoogen/SPUN/richness_maps/output/20230508_AM_SSU_outlier_removal_stats.csv')
 
 # Filter data
 filtered_data <- df %>% 
   left_join(summary, by = c("Resolve_Biome")) %>%
   filter(rarefied <= cutoff) %>%
+  left_join(metadata, by = c('sample_ID' = 'id')) %>%
   mutate(Resolve_Biome = as.factor(Resolve_Biome)) 
 
 # Write to file
-fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20230508_AM_SSU_sampled_onehot_outliersRemoved.csv')
+fwrite(filtered_data, '/Users/johanvandenhoogen/SPUN/richness_maps/data/20240610_AMF_sampled_outliersRemoved.csv')
 
 # Per biome boxplots
 filtered_data %>% 

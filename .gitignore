@@ -19,3 +19,5 @@ data/20240528_EM_richness_rarefied_sampled_oneHot_rwr_we.csv
 data/we_bootstrapSamples.csv
 data/20240610_ECM_richness_rarefied_sampled.csv
 data/20240610_AMF_richness_rarefied_sampled.csv
+data/20240610_ECM_sampled_outliersRemoved.csv
+data/20240610_ECM_sampled_outliersRemoved_onehot.csv
