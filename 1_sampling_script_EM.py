@@ -16,7 +16,10 @@ ee.Initialize()
 
 # Define distance in meters to gapfill (default = 10000)
 distanceToFillInMeters = 10000
-compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+
+sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/ecm_sampleintensity_5degrees_scaled').rename('ecm_sampling_density')
+
+compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec').addBands(sampling_density)
 
 # Function to gapfill missing pixels
 def gapFillAndExtendBounds(compositeToUse):
