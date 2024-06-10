@@ -17,9 +17,11 @@ ee.Initialize()
 # Define distance in meters to gapfill (default = 10000)
 distanceToFillInMeters = 10000
 
-sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('sampling_density')
+sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('amf_sampling_density')
 
-compositeToUse = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec').addBands(sampling_density)
+composite = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+
+compositeToUse = composite.addBands(sampling_density.reproject(composite.select(0).projection()))
 
 # Function to gapfill missing pixels
 def gapFillAndExtendBounds(compositeToUse):
@@ -98,7 +100,7 @@ covariateList = compositeToUse.bandNames().getInfo()
 compositeToUse = gapFillAndExtendBounds(compositeToUse)
 
 # FeatureCollection to sample
-points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_6/20230206_AM_richness_rarefied")
+points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_10/20240603_AM_richness_rarefied_rwr_we")
 
 def FCDFconv(fc):
         features = fc.getInfo()['features']
@@ -213,4 +215,4 @@ if __name__ == '__main__':
 						partial(extract_and_write_grid, grids=grids, points=points, region=unboundedGeo),
 						range(0, size))
 				results = pd.concat(results)
-				results.to_csv("data/20230206_GFv4_AM_richness_rarefied_sampled.csv")
+				results.to_csv("data/20240610_AMF_richness_rarefied_sampled.csv")

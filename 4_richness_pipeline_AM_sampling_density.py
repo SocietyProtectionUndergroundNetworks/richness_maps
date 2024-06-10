@@ -123,7 +123,8 @@ MEM9 = ee.Image("users/olegpril12/SPUN/AMF/MEM9").rename('MEM9')
 AM_spatial = ee.Image.cat(MEM1, MEM10, MEM11, MEM13, MEM18, MEM19, MEM20, MEM30, MEM35, MEM37, MEM4, MEM45, MEM51, MEM52, MEM58, MEM6, MEM7, MEM8, MEM81, MEM9)
 
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
-compositeOfInterest = compositeOfInterest.addBands(AM_spatial).reproject(compositeOfInterest.projection())
+
+amf_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('amf_sampling_density')
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -148,6 +149,7 @@ project_vars = [
 'primersNS31_AML2',
 'primersWANDA_AML2',
 ]
+
 
 spatial_preds = ['MEM1', 'MEM4', 'MEM6', 'MEM7', 'MEM8', 'MEM9', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM81']
                 
@@ -893,7 +895,7 @@ def finalImageClassification(compositeImg):
     return classifiedImage
 
 # Create appropriate composite image with bands to use
-compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+compositeToClassify = compositeOfInterest.addBands(constant_imgs).addBands(amf_sampling_density).select(covariateList).reproject(compositeOfInterest.projection())
 classifiedImage = finalImageClassification(compositeToClassify)
 
 # if log_transform_classProperty == True:

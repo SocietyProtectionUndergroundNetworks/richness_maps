@@ -101,6 +101,8 @@ covariateList = [
 
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
 
+ecm_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/ecm_sampleintensity_5degrees_scaled').rename('ecm_sampling_density')
+
 project_vars = [
 'sequencing_platform454Roche',
 'sequencing_platformIllumina',
@@ -133,6 +135,8 @@ project_vars = [
 ]
 
 covariateList = covariateList + project_vars + ['ecm_sampling_density']
+
+
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -998,7 +1002,7 @@ def finalImageClassification(compositeImg):
     return classifiedImage
 
 # Create appropriate composite image with bands to use
-compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
+compositeToClassify = compositeOfInterest.addBands(constant_imgs).addBands(ecm_sampling_density).select(covariateList).reproject(compositeOfInterest.projection())
 classifiedImage = finalImageClassification(compositeToClassify)
 
 regressedImage = classifiedImage.select(classProperty+'_Regressed')
