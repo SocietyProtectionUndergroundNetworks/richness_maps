@@ -34,7 +34,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_10/' + guild + '_guildsFixed'
+projectFolder = '000_SPUN_GFv4_10/' + guild + '_wSamplingDensity'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -101,7 +101,8 @@ covariateList = [
 
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
 
-ecm_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/ecm_sampleintensity_5degrees_scaled').rename('ecm_sampling_density')
+# ecm_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/ecm_sampleintensity_5degrees_scaled').rename('ecm_sampling_density')
+ecm_sampling_density = ee.Image(1).rename('ecm_sampling_density')
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -232,7 +233,7 @@ strataDict = {
 # I.e., create bash variables in order to create/check/delete Earth Engine Assets
 
 # Specify main bash functions being used
-bashFunction_EarthEngine = '/Users/johanvandenhoogen/opt/anaconda3/envs/ee/bin/earthengine'
+bashFunction_EarthEngine = '/Users/johanvandenhoogen/miniconda3/envs/ee/bin/earthengine'
 # bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
 bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
 
@@ -481,11 +482,13 @@ try:
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20231001_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20240610_ECM_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
     rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
+
+    rawPointCollection.rename(columns={'sample_ID': 'sample_id'}, inplace=True)
 
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
     fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
@@ -743,8 +746,8 @@ classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascendi
 classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_kNNDMW_guildsFixed.csv', index=False)
-classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_kNNDMW_guildsFixed.csv', index=False)
+classDfSortedRegression.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Regression_wSamplingDensity.csv', index=False)
+classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_wSamplingDensity.csv', index=False)
 
 # Get top model name
 bestModelNameRegression = grid_search_resultsRegression.limit(1, sort_acc_prop, False).first().get('cName')

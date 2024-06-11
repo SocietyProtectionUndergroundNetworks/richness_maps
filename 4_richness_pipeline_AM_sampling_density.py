@@ -33,7 +33,7 @@ classProperty = guild + '_richness'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_10/' + guild + '_KNNDMW'
+projectFolder = '000_SPUN_GFv4_10/' + guild + '_wSamplingDensity'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -124,7 +124,8 @@ AM_spatial = ee.Image.cat(MEM1, MEM10, MEM11, MEM13, MEM18, MEM19, MEM20, MEM30,
 
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
 
-amf_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('amf_sampling_density')
+# amf_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('amf_sampling_density')
+amf_sampling_density = ee.Image(1).rename('amf_sampling_density')
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -149,7 +150,6 @@ project_vars = [
 'primersNS31_AML2',
 'primersWANDA_AML2',
 ]
-
 
 spatial_preds = ['MEM1', 'MEM4', 'MEM6', 'MEM7', 'MEM8', 'MEM9', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM81']
                 
@@ -249,9 +249,9 @@ strataDict = {
 # I.e., create bash variables in order to create/check/delete Earth Engine Assets
 
 # Specify main bash functions being used
-bashFunction_EarthEngine = '/Users/johanvandenhoogen/opt/anaconda3/envs/ee/bin/earthengine'
-bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
-# bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
+bashFunction_EarthEngine = '/Users/johanvandenhoogen/miniconda3/envs/ee/bin/earthengine'
+# bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
+bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
 
 # Specify the arguments to these functions
 arglist_preEEUploadTable = ['upload','table']
@@ -498,11 +498,13 @@ try:
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20230508_AM_SSU_sampled_onehot_outliersRemoved.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20240610_AMF_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
     rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
+
+    rawPointCollection.rename(columns={'sample_ID': 'sample_id'}, inplace=True)
 
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
     fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
@@ -698,7 +700,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+classProperty+'_grid_search_results_kNNDMW.csv', index=False)
+classDfSorted.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_wSamplingDensity.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
