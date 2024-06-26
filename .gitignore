@@ -20,3 +20,5 @@ data/20240610_ECM_richness_rarefied_sampled.csv
 data/20240610_AMF_richness_rarefied_sampled.csv
 data/20240610_ECM_sampled_outliersRemoved.csv
 data/20240610_ECM_sampled_outliersRemoved_onehot.csv
+data/arbuscular_mycorrhizal_rwr_bootstrapSamples.csv
+data/ectomycorrhizal_rwr_bootstrapSamples.csv
