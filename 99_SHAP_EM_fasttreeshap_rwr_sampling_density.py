@@ -71,6 +71,7 @@ envCovariateListRenamed = [
     'Sand Content at 5cm',
     'SOC at 5cm',
     'Soil pH at 5cm',
+    'ecm_sampling_density'
 ]
 
 project_vars = [
@@ -109,7 +110,7 @@ column_names = dict(zip(envCovariateList, envCovariateListRenamed))
 df = df.rename(columns=column_names)
 
 # Create final list of covariates
-covariateList = envCovariateListRenamed + project_vars + ['ecm_sampling_density']
+covariateList = envCovariateListRenamed + project_vars
 
 # Subset columns from df
 df = df[covariateList + [classProperty]]
@@ -187,7 +188,7 @@ if __name__ == '__main__':
     mask[drop_indices] = False
 
     # Create a new dataframe without the features to drop
-    df_filtered = df[envCovariateListRenamed + ['ecm_sampling_density']]
+    df_filtered = df[envCovariateListRenamed]
 
     # Filter the mean SHAP values
     mean_shap_values_filtered = mean_shap_values[:, mask]
@@ -214,7 +215,7 @@ if __name__ == '__main__':
     new_feature_names = envCovariateListRenamed + ["project_vars"]
 
     # Create a df where project vars are Nan
-    df_project_vars_grouped = df[envCovariateListRenamed + ['ecm_sampling_density']]
+    df_project_vars_grouped = df[envCovariateListRenamed]
     df_project_vars_grouped.loc[:, 'Project Variables'] = np.NaN
 
     plt.figure()
