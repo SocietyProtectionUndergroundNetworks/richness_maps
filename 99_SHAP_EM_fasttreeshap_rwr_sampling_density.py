@@ -45,6 +45,7 @@ envCovariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'ecm_sampling_density'
 ]
 
 # Rename variables in covariateList to increase readability
@@ -71,7 +72,7 @@ envCovariateListRenamed = [
     'Sand Content at 5cm',
     'SOC at 5cm',
     'Soil pH at 5cm',
-    'ecm_sampling_density'
+    'Sampling Density'
 ]
 
 project_vars = [
@@ -175,7 +176,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/20240620_ectomycorrhizal_rwr_shap_summary_plots_full.png', dpi=300)
+    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_full.png', dpi=300)
 
     # Plot 2: SHAP summary plot, with project_vars removed
     # Calculate mean SHAP values
@@ -199,7 +200,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/20240620_ectomycorrhizal_rwr_shap_summary_plots_projectRemoved.png', dpi=300)
+    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_projectRemoved.png', dpi=300)
 
     # Plot 3: SHAP summary plot, with project_vars grouped together
     # Sum 'project_vars' SHAP values together
@@ -222,7 +223,7 @@ if __name__ == '__main__':
     shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, sort=True, show = False)
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
-    plt.savefig('figures/20240620_ectomycorrhizal_rwr_shap_summary_plots_projectGrouped.png', dpi=300)
+    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_projectGrouped.png', dpi=300)
 
     # # Plot 4: SHAP dependence plots for the top 6 features
     # # Create SHAP explanation object        
