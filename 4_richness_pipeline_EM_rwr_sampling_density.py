@@ -746,7 +746,7 @@ classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascendi
 # classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
 
 # Write model results to csv
-classDfSortedRegression.to_csv('output/'+today+guild+'_'+classProperty+'_grid_search_results_Regression_guildsFixed.csv', index=False)
+classDfSortedRegression.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_grid_search_results_Regression.csv', index=False)
 # classDfSortedClassification.to_csv('output/'+today+'_'+classProperty+'_grid_search_results_Classification_kNNDMW_guildsFixed.csv', index=False)
 
 # Get top model name

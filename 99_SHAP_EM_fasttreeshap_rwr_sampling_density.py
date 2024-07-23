@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import multiprocessing
 from contextlib import contextmanager
 import fasttreeshap
+import datetime
+
+today = datetime.date.today().strftime("%Y%m%d")
 
 # Constants
 classProperty = 'rwr'
@@ -126,7 +129,7 @@ y = df[classProperty]
 
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
-    grid_search_results = pd.read_csv('output/20240620ectomycorrhizal_rwr_grid_search_results_Regression_guildsFixed.csv')
+    grid_search_results = pd.read_csv('output/20240723_ectomycorrhizal_rwr_grid_search_results_Regression.csv')
     VPS = int(grid_search_results['cName'][rep].split('VPS')[1].split('_')[0])
     LP = int(grid_search_results['cName'][rep].split('LP')[1].split('_')[0])
 
@@ -162,13 +165,13 @@ if __name__ == '__main__':
     reps = list(range(0, 10))
     with poolcontext(NPROC) as pool:
         try:
-            with np.load('shap_values_EM_rwr_wSamplingDens.npz') as data:
+            with np.load('shap_values_EM_rwr_samplingdens.npz') as data:
                 shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
         except Exception as e:
             shap_values_list = pool.map(calculate_shap_values, reps)
               
             # Save SHAP values to file
-            np.savez('shap_values_EM_rwr_wSamplingDens.npz', *shap_values_list)
+            np.savez('shap_values_EM_rwr_samplingdens.npz', *shap_values_list)
 
     # Plot 1: SHAP summary plot, with all features
     plt.figure()
@@ -176,7 +179,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_full.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_'+'ectomycorrhizal_rwr_samplingdens_shap_summary_plots_full.png', dpi=300)
 
     # Plot 2: SHAP summary plot, with project_vars removed
     # Calculate mean SHAP values
@@ -200,7 +203,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_projectRemoved.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_'+'ectomycorrhizal_rwr_samplingdens_shap_summary_plots_projectRemoved.png', dpi=300)
 
     # Plot 3: SHAP summary plot, with project_vars grouped together
     # Sum 'project_vars' SHAP values together
@@ -223,7 +226,7 @@ if __name__ == '__main__':
     shap.summary_plot(combined_shap_values, features = df_project_vars_grouped, sort=True, show = False)
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
-    plt.savefig('figures/shap/20240722_ectomycorrhizal_rwr_shap_summary_plots_projectGrouped.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_'+'ectomycorrhizal_rwr_samplingdens_shap_summary_plots_projectGrouped.png', dpi=300)
 
     # # Plot 4: SHAP dependence plots for the top 6 features
     # # Create SHAP explanation object        

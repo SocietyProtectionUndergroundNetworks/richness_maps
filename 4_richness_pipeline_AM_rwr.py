@@ -98,32 +98,7 @@ covariateList = [
 'SG_Soil_pH_H2O_005cm',
 ]
 
-# Spatial predictors
-MEM1 = ee.Image("users/olegpril12/SPUN/AMF/MEM1").rename('MEM1')
-MEM10 = ee.Image("users/olegpril12/SPUN/AMF/MEM10").rename('MEM10')
-MEM11 = ee.Image("users/olegpril12/SPUN/AMF/MEM11").rename('MEM11')
-MEM13 = ee.Image("users/olegpril12/SPUN/AMF/MEM13").rename('MEM13')
-MEM18 = ee.Image("users/olegpril12/SPUN/AMF/MEM18").rename('MEM18')
-MEM19 = ee.Image("users/olegpril12/SPUN/AMF/MEM19").rename('MEM19')
-MEM20 = ee.Image("users/olegpril12/SPUN/AMF/MEM20").rename('MEM20')
-MEM30 = ee.Image("users/olegpril12/SPUN/AMF/MEM30").rename('MEM30')
-MEM35 = ee.Image("users/olegpril12/SPUN/AMF/MEM35").rename('MEM35')
-MEM37 = ee.Image("users/olegpril12/SPUN/AMF/MEM37").rename('MEM37')
-MEM4 = ee.Image("users/olegpril12/SPUN/AMF/MEM4").rename('MEM4')
-MEM45 = ee.Image("users/olegpril12/SPUN/AMF/MEM45").rename('MEM45')
-MEM51 = ee.Image("users/olegpril12/SPUN/AMF/MEM51").rename('MEM51')
-MEM52 = ee.Image("users/olegpril12/SPUN/AMF/MEM52").rename('MEM52')
-MEM58 = ee.Image("users/olegpril12/SPUN/AMF/MEM58").rename('MEM58')
-MEM6 = ee.Image("users/olegpril12/SPUN/AMF/MEM6").rename('MEM6')
-MEM7 = ee.Image("users/olegpril12/SPUN/AMF/MEM7").rename('MEM7')
-MEM8 = ee.Image("users/olegpril12/SPUN/AMF/MEM8").rename('MEM8')
-MEM81 = ee.Image("users/olegpril12/SPUN/AMF/MEM81").rename('MEM81')
-MEM9 = ee.Image("users/olegpril12/SPUN/AMF/MEM9").rename('MEM9')
-
-AM_spatial = ee.Image.cat(MEM1, MEM10, MEM11, MEM13, MEM18, MEM19, MEM20, MEM30, MEM35, MEM37, MEM4, MEM45, MEM51, MEM52, MEM58, MEM6, MEM7, MEM8, MEM81, MEM9)
-
 compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
-compositeOfInterest = compositeOfInterest.addBands(AM_spatial).reproject(compositeOfInterest.projection())
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -149,9 +124,7 @@ project_vars = [
 'primersWANDA_AML2',
 ]
 
-spatial_preds = ['MEM1', 'MEM4', 'MEM6', 'MEM7', 'MEM8', 'MEM9', 'MEM10', 'MEM11', 'MEM13', 'MEM18', 'MEM19', 'MEM20', 'MEM30', 'MEM35', 'MEM37', 'MEM45', 'MEM51', 'MEM52', 'MEM58', 'MEM81']
-                
-covariateList = covariateList + project_vars #+ spatial_preds
+covariateList = covariateList + project_vars 
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -696,7 +669,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/AMF_'+classProperty+'_grid_search_results_kNNDMW_rwr.csv', index=False)
+classDfSorted.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_grid_search_results.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')

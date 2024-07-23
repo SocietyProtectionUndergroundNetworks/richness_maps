@@ -6,7 +6,9 @@ from itertools import repeat, chain
 import matplotlib.pyplot as plt
 import multiprocessing
 from contextlib import contextmanager
+import datetime
 
+today = datetime.date.today().strftime("%Y%m%d")
 # Constants
 classProperty = 'rwr'
 df = pd.read_csv('data/arbuscular_mycorrhizalrwr_training_data.csv')
@@ -69,8 +71,7 @@ envCovariateListRenamed = [
     'Depth to Bedrock',
     'Sand Content at 5cm',
     'SOC at 5cm',
-    'Soil pH at 5cm',
-    'amf_sampling_density'
+    'Soil pH at 5cm'
 ]
 
 project_vars = [
@@ -117,7 +118,7 @@ y = df[classProperty]
 
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
-    grid_search_results = pd.read_csv('output/20240620arbuscular_mycorrhizal_rwr_grid_search_results_wSamplingDensity.csv')
+    grid_search_results = pd.read_csv('output/20240620_arbuscular_mycorrhizal_rwr_grid_search_results.csv')
     VPS = int(grid_search_results['cName'][rep].split('VPS')[1].split('_')[0])
     LP = int(grid_search_results['cName'][rep].split('LP')[1].split('_')[0])
 
@@ -173,7 +174,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/20240620_arbuscular_mycorrhizal_rwr_shap_summary_plots_full.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_arbuscular_mycorrhizal_rwr_shap_summary_plots_full.png', dpi=300)
 
     # Plot 2: SHAP summary plot, with project_vars removed
     # Calculate mean SHAP values
@@ -198,7 +199,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/20240620_arbuscular_mycorrhizal_rwr_shap_summary_plots_projectRemoved.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_arbuscular_mycorrhizal_rwr_shap_summary_plots_projectRemoved.png', dpi=300)
 
     # Plot 3: SHAP summary plot, with project_vars grouped together
     # Sum 'project_vars' SHAP values together
@@ -222,7 +223,7 @@ if __name__ == '__main__':
     plt.xlabel('Mean absolute SHAP value')
     plt.tight_layout()
     # plt.show()
-    plt.savefig('figures/20240620_arbuscular_mycorrhizal_rwr_shap_summary_plots_projectGrouped.png', dpi=300)
+    plt.savefig('figures/shap/'+today+'_arbuscular_mycorrhizal_rwr_shap_summary_plots_projectGrouped.png', dpi=300)
 
     # # Plot 4: SHAP dependence plots for the top 6 features
     # # Create SHAP explanation object        
