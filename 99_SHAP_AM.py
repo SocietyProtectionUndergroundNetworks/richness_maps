@@ -268,16 +268,16 @@ if __name__ == '__main__':
     # # plt.show()
     # plt.savefig('figures/20240118_arbuscular_mycorrhizal_richness_shap_bar_plots_projectGrouped.png', dpi=300)
 
-    # mean_shap_values = np.mean(np.abs(combined_shap_values), axis=0)
+    mean_shap_values = np.mean(np.abs(combined_shap_values), axis=0)
 
-    # # Create a DataFrame with feature names from df_project_vars_grouped and their corresponding mean SHAP values
-    # df_mean_shap_values = pd.DataFrame({
-    #     'Feature': df_project_vars_grouped.columns,
-    #     'Mean SHAP Value': mean_shap_values
-    # })
+    # Create a DataFrame with feature names from df_project_vars_grouped and their corresponding mean SHAP values
+    df_mean_shap_values = pd.DataFrame({
+        'Feature': df_project_vars_grouped.columns,
+        'Mean SHAP Value': mean_shap_values
+    })
 
-    # # Sort by absolute mean SHAP value
-    # df_mean_shap_values = df_mean_shap_values.reindex(df_mean_shap_values['Mean SHAP Value'].sort_values(ascending=False).index)
+    # Sort by absolute mean SHAP value
+    df_mean_shap_values = df_mean_shap_values.reindex(df_mean_shap_values['Mean SHAP Value'].sort_values(ascending=False).index)
 
-    # # Write to file
-    # df_mean_shap_values.to_csv('output/20240118_arbuscular_mycorrhizal_richness_mean_shap_values.csv', index=False)
+    # Write to file
+    df_mean_shap_values.to_csv('figures/shap/'+today+'_'+'arbusucular_mycorrhizal_richness_mean_shap_values.csv', index=False)
