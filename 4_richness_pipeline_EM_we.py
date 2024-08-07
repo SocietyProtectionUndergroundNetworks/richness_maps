@@ -752,94 +752,96 @@ top_10ModelsRegression = grid_search_resultsRegression.limit(10, sort_acc_prop, 
 
 print('Moving on...')
 
-# ##################################################################################################################################################################
-# # Predicted - Observed
-# ##################################################################################################################################################################
-# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+##################################################################################################################################################################
+# Predicted - Observed
+##################################################################################################################################################################
+fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
-# try:
-#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-#     predObs_wResiduals.size().getInfo()
+try:
+    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+    predObs_wResiduals.size().getInfo()
 
-# except Exception as e:
-#     for n in list(range(0,10)):
-#         modelNameRegression = top_10ModelsRegression.get(n)
-#         modelNameClassification = top_10ModelsClassification.get(n)
+except Exception as e:
+    for n in list(range(0,10)):
+        modelNameRegression = top_10ModelsRegression.get(n)
+        # modelNameClassification = top_10ModelsClassification.get(n)
 
-#         # Load the best model from the classifier list
-#         classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
-#         classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+        # Load the best model from the classifier list
+        classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+        # classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
 
-#         # Train the classifier with the collection
-#         # REGRESSION
-#         fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
-#         trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+        # Train the classifier with the collection
+        # REGRESSION
+        fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
+        trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
 
-#         # Classification
-#         fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
-#         trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+        # Classification
+        fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+        # trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
 
-#         # Classify the FC
-#         def classifyFunction(f):
-#             classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
-#             classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
+        # Classify the FC
+        def classifyFunction(f):
+            classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
+            # classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
 
-#             featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
+            # featureToReturn = classfiedRegression.set(classProperty+'_Predicted')# classfiedClassification.get(classProperty+'_Classified'))
 
-#             # Calculate final predicted value as product of classification and regression
-#             featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
-#             return featureToReturn
+            # Calculate final predicted value as product of classification and regression
+            # featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
+            return classfiedRegression
 
-#         # Classify fcOI
-#         predObs = fcOI.map(classifyFunction)
+        # Classify fcOI
+        predObs = fcOI.map(classifyFunction)
 
-#         # Add coordinates to FC
-#         predObs = predObs.map(addLatLon)
+        # Add coordinates to FC
+        predObs = predObs.map(addLatLon)
 
-#         # back-log transform predicted and observed values
-#         if log_transform_classProperty == True:
-#             predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-#             predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
-#             predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
+        # back-log transform predicted and observed values
+        if log_transform_classProperty == True:
+            predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+            # predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+            predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
 
-#         # Add residuals to FC
-#         predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+        # Add residuals to FC
+        # predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+        predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Regressed')).subtract(f.get(classProperty))))
 
-#         # Export to Assets
-#         predObsexport = ee.batch.Export.table.toAsset(
-#             collection = predObs_wResiduals,
-#             description = classProperty+'_pred_obs_rep_'+str(n),
-#             assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)
-#         )
-#         predObsexport.start()
+        # Export to Assets
+        predObsexport = ee.batch.Export.table.toAsset(
+            collection = predObs_wResiduals,
+            description = classProperty+'_pred_obs_rep_'+str(n),
+            assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)
+        )
+        predObsexport.start()
 
-#     # !! Break and wait
-#     count = 1
-#     while count >= 1:
-#         taskList = [str(i) for i in ee.batch.Task.list()]
-#         subsetList = [s for s in taskList if classProperty in s]
-#         subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-#         count = len(subsubList)
-#         print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
-#         time.sleep(normalWaitTime)
-#     print('Moving on...')
+    # !! Break and wait
+    count = 1
+    while count >= 1:
+        taskList = [str(i) for i in ee.batch.Task.list()]
+        subsetList = [s for s in taskList if classProperty in s]
+        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+        count = len(subsubList)
+        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+        time.sleep(normalWaitTime)
+    print('Moving on...')
 
-#     predObsList = []
-#     for n in list(range(0,10)):
-#         predObs = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-#         predObsList.append(predObs)
+    predObsList = []
+    for n in list(range(0,10)):
+        predObs = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+        predObsList.append(predObs)
 
-#     predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
+    predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
         
-# # Convert to pd
-# predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+# Convert to pd
+predObs_list = [ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)) for n in list(range(0,10))] 
 
-# # Group by sample ID to return mean across ensemble prediction
-# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+# Map GEE_FC_to_pd to each element in the list
+predObs_df = pd.concat([GEE_FC_to_pd(fc) for fc in predObs_list])
 
-# predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
+# Group by sample ID to return mean across ensemble prediction
+predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-# print('Predicted Observed done, moving on...')
+predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_pred_obs.csv', index=False)
 
 #################################################################################################################################################################
 # Classify image

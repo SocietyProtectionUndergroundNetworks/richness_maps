@@ -831,8 +831,10 @@ except Exception as e:
 
     predObs_wResiduals = ee.FeatureCollection(predObsList).flatten()
         
-# Convert to pd
-predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+predObs_list = [ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs_rep_'+str(n)) for n in list(range(0,10))] 
+
+# Map GEE_FC_to_pd to each element in the list
+predObs_df = pd.concat([GEE_FC_to_pd(fc) for fc in predObs_list])
 
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
