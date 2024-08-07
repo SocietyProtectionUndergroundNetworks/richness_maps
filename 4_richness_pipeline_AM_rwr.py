@@ -761,7 +761,6 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_pred_obs.csv', index=False)
 
 #################################################################################################################################################################
