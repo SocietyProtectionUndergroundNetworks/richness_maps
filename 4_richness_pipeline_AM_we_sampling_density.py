@@ -687,86 +687,86 @@ print('Moving on...')
 ##################################################################################################################################################################
 # Predicted - Observed
 ##################################################################################################################################################################
-# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
-# try:
-#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-#     predObs_wResiduals.size().getInfo()
+try:
+    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+    predObs_wResiduals.size().getInfo()
 
-# except Exception as e:
-#     def predObs(fcOI):
-#         if ensemble == False:
-#             # Load the best model from the classifier list
-#             classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+except Exception as e:
+    def predObs(fcOI):
+        if ensemble == False:
+            # Load the best model from the classifier list
+            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-#             # Train the classifier with the collection
-#             trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+            # Train the classifier with the collection
+            trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
             
-#             # Classify the FC
-#             classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
+            # Classify the FC
+            classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
-#             return classifiedFC
+            return classifiedFC
 
-#         if ensemble == True:
-#             def classifyFC(classifierName):
-#                 # Load the best model from the classifier list
-#                 classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+        if ensemble == True:
+            def classifyFC(classifierName):
+                # Load the best model from the classifier list
+                classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
             
-#                 # Train the classifier with the collection
-#                 trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+                # Train the classifier with the collection
+                trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
 
-#                 # Classify the FC
-#                 classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
+                # Classify the FC
+                classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
-#                 return classifiedFC
+                return classifiedFC
 
-#             # Map function over list of models in ensemble
-#             classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
+            # Map function over list of models in ensemble
+            classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
 
-#             return classifiedFC
+            return classifiedFC
 
-#     # Classify FC
-#     predObs = predObs(fcOI)
+    # Classify FC
+    predObs = predObs(fcOI)
 
-#     # Add coordinates to FC
-#     predObs = predObs.map(addLatLon)
+    # Add coordinates to FC
+    predObs = predObs.map(addLatLon)
 
-#     # reverse log transform predicted and observed values
-#     if log_transform_classProperty == True:
-#         predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-#         predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+    # reverse log transform predicted and observed values
+    if log_transform_classProperty == True:
+        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
 
-#     # Add residuals to FC
-#     predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
+    # Add residuals to FC
+    predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
 
-#     # Export to Assets
-#     predObsexport = ee.batch.Export.table.toAsset(
-#         collection = predObs_wResiduals,
-#         description = classProperty+'_pred_obs',
-#         assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
-#     )
-#     predObsexport.start()
+    # Export to Assets
+    predObsexport = ee.batch.Export.table.toAsset(
+        collection = predObs_wResiduals,
+        description = classProperty+'_pred_obs',
+        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
+    )
+    predObsexport.start()
 
-#     # !! Break and wait
-#     count = 1
-#     while count >= 1:
-#         taskList = [str(i) for i in ee.batch.Task.list()]
-#         subsetList = [s for s in taskList if classProperty in s]
-#         subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-#         count = len(subsubList)
-#         print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
-#         time.sleep(normalWaitTime)
-#     print('Moving on...')
+    # !! Break and wait
+    count = 1
+    while count >= 1:
+        taskList = [str(i) for i in ee.batch.Task.list()]
+        subsetList = [s for s in taskList if classProperty in s]
+        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+        count = len(subsubList)
+        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+        time.sleep(normalWaitTime)
+    print('Moving on...')
 
-#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
 
-# # Convert to pd
-# predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+# Convert to pd
+predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
-# # Group by sample ID to return mean across ensemble prediction
-# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+# Group by sample ID to return mean across ensemble prediction
+predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-# predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_pred_obs.csv')
+predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_sampling_density_pred_obs.csv', index=False)
 
 #################################################################################################################################################################
 # Classify image
