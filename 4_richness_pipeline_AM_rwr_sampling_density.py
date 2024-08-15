@@ -1266,16 +1266,13 @@ print('Map exports started! Moving on...')
 ##################################################################################################################################################################
 # Spatial Leave-One-Out cross validation
 ##################################################################################################################################################################
-assetIDToCreate_Folder = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv'
-if any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
+assetID_SLOOCV = 'users/'+usernameFolderString+'/'+projectFolder+'/'+'sLOOCV'
+if any(x in subprocess.run(bashCommandList_Detect+[assetID_SLOOCV],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
     pass
 else:
-    # perform the folder creation
-    print(assetIDToCreate_Folder,'being created...')
-
     # Create the folder within Earth Engine
-    subprocess.run(bashCommandList_CreateFolder+[assetIDToCreate_Folder])
-    while any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
+    subprocess.run(bashCommandList_CreateFolder+[assetID_SLOOCV])
+    while any(x in subprocess.run(bashCommandList_Detect+[assetID_SLOOCV],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
         print('Waiting for asset to be created...')
         time.sleep(normalWaitTime)
     print('Asset created!')
@@ -1299,7 +1296,7 @@ buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 
 n_reps = 10
 nList = list(range(0,n_reps))
 
-fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_10/arbuscular_mycorrhizal_KNNDMW/arbuscular_mycorrhizal_richness_training_data')
+fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
 n_points = 1000
 
@@ -1404,7 +1401,7 @@ for rep in nList:
         bloo_cv_fc_export = ee.batch.Export.table.toAsset(
             collection = sloo_cv,
             description = classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer),
-            assetId = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv/'+classProperty+'_sloo_cv_results_wExtrapolation_'+str(buffer)+'_rep_'+str(rep),
+            assetId = assetID_SLOOCV+'/'+classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer)+'_rep_'+str(rep),
         )
 
         bloo_cv_fc_export.start()
