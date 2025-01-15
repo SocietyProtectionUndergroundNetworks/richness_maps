@@ -1,0 +1,695 @@
+# Import the modules of interest
+import pandas as pd
+import numpy as np
+import subprocess
+import time
+import datetime
+import ee
+import matplotlib.pyplot as plt
+from pathlib import Path
+from scipy.spatial import ConvexHull
+from sklearn.decomposition import PCA
+from itertools import combinations
+from itertools import repeat
+from functions.determineBlockSizeForCV import *
+
+ee.Initialize()
+
+today = datetime.date.today().strftime("%Y%m%d")
+
+guild = 'ectomycorrhizal'
+
+####################################################################################################################################################################
+# Configuration
+####################################################################################################################################################################
+# Input the name of the username that serves as the home folder for asset storage
+usernameFolderString = 'johanvandenhoogen'
+
+# Input the Cloud Storage Bucket that will hold the bootstrap collections when uploading them to Earth Engine
+# !! This bucket should be pre-created before running this script
+bucketOfInterest = 'johanvandenhoogen'
+
+# Input the name of the classification property
+classProperty = guild + '_richness'
+
+# Input the name of the project folder inside which all of the assets will be stored
+# This folder will be generated automatically below, if it isn't yet present
+projectFolder = '000_SPUN_GFv4_10/' + guild + '_guildsFixed'
+
+# Input the normal wait time (in seconds) for "wait and break" cells
+normalWaitTime = 5
+
+# Input a longer wait time (in seconds) for "wait and break" cells
+longWaitTime = 10
+
+# Specify the column names where the latitude and longitude information is stored
+latString = 'Pixel_Lat'
+longString = 'Pixel_Long'
+
+# Log transform classProperty? Boolean, either True or False
+log_transform_classProperty = True
+
+# Ensemble of top 10 models?
+ensemble = True
+
+# Spatial leave-one-out cross-validation settings
+# skip test points outside training space after removing points in buffer zone? This might reduce extrapolation but overestimate accuracy
+loo_cv_wPointRemoval = False
+
+# Define buffer size in meters; use Moran's I or other test to determine SAC range
+# Alternatively: specify buffer size as list, to test across multiple buffer sizes
+buffer_size = 100000
+
+####################################################################################################################################################################
+# Covariate data settings
+####################################################################################################################################################################
+
+# List of the covariates to use
+covariateList = [
+'CGIAR_PET',
+'CHELSA_BIO_Annual_Mean_Temperature',
+'CHELSA_BIO_Annual_Precipitation',
+'CHELSA_BIO_Max_Temperature_of_Warmest_Month',
+'CHELSA_BIO_Precipitation_Seasonality',
+'ConsensusLandCover_Human_Development_Percentage',
+# 'ConsensusLandCoverClass_Barren',
+# 'ConsensusLandCoverClass_Deciduous_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Broadleaf_Trees',
+# 'ConsensusLandCoverClass_Evergreen_Deciduous_Needleleaf_Trees',
+# 'ConsensusLandCoverClass_Herbaceous_Vegetation',
+# 'ConsensusLandCoverClass_Mixed_Other_Trees',
+# 'ConsensusLandCoverClass_Shrubs',
+'EarthEnvTexture_CoOfVar_EVI',
+'EarthEnvTexture_Correlation_EVI',
+'EarthEnvTexture_Homogeneity_EVI',
+'EarthEnvTopoMed_AspectCosine',
+'EarthEnvTopoMed_AspectSine',
+'EarthEnvTopoMed_Elevation',
+'EarthEnvTopoMed_Slope',
+'EarthEnvTopoMed_TopoPositionIndex',
+'EsaCci_BurntAreasProbability',
+'GHS_Population_Density',
+'GlobBiomass_AboveGroundBiomass',
+# 'GlobPermafrost_PermafrostExtent',
+'MODIS_NPP',
+# 'PelletierEtAl_SoilAndSedimentaryDepositThicknesses',
+'SG_Depth_to_bedrock',
+'SG_Sand_Content_005cm',
+'SG_SOC_Content_005cm',
+'SG_Soil_pH_H2O_005cm',
+]
+
+compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+
+project_vars = [
+'sequencing_platform454Roche',
+'sequencing_platformIllumina',
+'sequencing_platformIonTorrent',
+'sequencing_platformPacBio',
+'sample_typerhizosphere_soil',
+'sample_typesoil',
+'sample_typetopsoil',
+'primers5_8S_Fun_ITS4_Fun',
+'primersfITS7_ITS4',
+'primersfITS9_ITS4',
+'primersgITS7_ITS4',
+'primersgITS7_ITS4_then_ITS9_ITS4',
+'primersgITS7_ITS4_ITS4arch',
+'primersgITS7_ITS4m',
+'primersgITS7_ITS4ngs',
+'primersgITS7ngs_ITS4ngsUni',
+'primersITS_S2F___ITS3_mixed_1_1_ITS4',
+'primersITS1_ITS4',
+'primersITS1F_ITS4',
+'primersITS1F_ITS4_then_fITS7_ITS4',
+'primersITS1F_ITS4_then_ITS3_ITS4',
+'primersITS1ngs_ITS4ngs_or_ITS1Fngs_ITS4ngs',
+'primersITS3_KYO2_ITS4',
+'primersITS3_ITS4',
+'primersITS3ngs1_to_5___ITS3ngs10_ITS4ngs',
+'primersITS3ngs1_to_ITS3ngs11_ITS4ngs',
+'primersITS86F_ITS4',
+'primersITS9MUNngs_ITS4ngsUni',
+]
+
+covariateList = covariateList + project_vars
+
+####################################################################################################################################################################
+# Cross validation settings
+####################################################################################################################################################################
+# Set k for k-fold CV
+k = 10
+
+# Make a list of the k-fold CV assignments to use
+kList = list(range(1,k+1))
+
+# Set number of trees in RF models
+nTrees = 250
+
+# Specify whether to use spatial or random CV
+spatialCV = True 
+
+# Input the name of the property that holds the CV fold assignment
+cvFoldHeader = 'CV_Fold'
+
+cvFoldString_Spatial = cvFoldHeader + '_Spatial'
+cvFoldString_Random = cvFoldHeader + '_Random'
+
+# Metric to use for sorting k-fold CV hyperparameter tuning (default: R2)
+sort_acc_prop = 'Mean_R2' # (either one of 'Mean_R2', 'Mean_MAE', 'Mean_RMSE')
+
+if spatialCV == True:
+    sort_acc_prop = sort_acc_prop + '_Spatial'
+else:
+    sort_acc_prop = sort_acc_prop + '_Random'
+
+# Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
+titleOfCSVWithCVAssignments = classProperty+"_training_data"
+
+# Asset ID of uploaded dataset after processing
+assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
+
+# Write the name of a local staging area folder for outputted CSV's
+holdingFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/data/'
+outputFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/output'
+
+# Create directory to hold training data
+Path(holdingFolder).mkdir(parents=True, exist_ok=True)
+
+####################################################################################################################################################################
+# Export settings
+####################################################################################################################################################################
+
+# Set pyramidingPolicy for exporting purposes
+pyramidingPolicy = 'mean'
+
+# Load a geometry to use for the export
+exportingGeometry = ee.Geometry.Polygon([[[-180, 88], [180, 88], [180, -88], [-180, -88]]], None, False)
+
+####################################################################################################################################################################
+# Bootstrap settings
+####################################################################################################################################################################
+
+# Number of bootstrap iterations
+bootstrapIterations = 100
+
+# Generate the seeds for bootstrapping
+seedsToUseForBootstrapping = list(range(1, bootstrapIterations+1))
+
+# Input the header text that will name the bootstrapped dataset
+bootstrapSamples = classProperty+'_bootstrapSamples'
+
+# Write the name of the variable used for stratification
+stratificationVariableString = "Resolve_Biome"
+
+# Input the dictionary of values for each of the stratification category levels
+# !! This area breakdown determines the proportion of each biome to include in every bootstrap
+strataDict = {
+    1: 14.900835665820974,
+    2: 2.941697660221864,
+    3: 0.526059731441294,
+    4: 9.56387696566245,
+    5: 2.865354077500338,
+    6: 11.519674266872787,
+    7: 16.26999434439293,
+    8: 8.047078485979089,
+    9: 0.861212221078014,
+    10: 3.623974712557433,
+    11: 6.063922959332467,
+    12: 2.5132866428302836,
+    13: 20.037841544639985,
+    14: 0.26519072167008,
+}
+
+####################################################################################################################################################################
+# Bash and Google Cloud Bucket settings
+####################################################################################################################################################################
+# Specify the necessary arguments to upload the files to a Cloud Storage bucket
+# I.e., create bash variables in order to create/check/delete Earth Engine Assets
+
+# Specify main bash functions being used
+bashFunction_EarthEngine = '/Users/johanvandenhoogen/opt/anaconda3/envs/ee/bin/earthengine'
+# bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
+bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
+
+# Specify the arguments to these functions
+arglist_preEEUploadTable = ['upload','table']
+arglist_postEEUploadTable = ['--x_column', longString, '--y_column', latString]
+arglist_preGSUtilUploadFile = ['cp']
+formattedBucketOI = 'gs://'+bucketOfInterest
+assetIDStringPrefix = '--asset_id='
+arglist_CreateCollection = ['create','collection']
+arglist_CreateFolder = ['create','folder']
+arglist_Detect = ['asset','info']
+arglist_Delete = ['rm','-r']
+arglist_ls = ['ls']
+stringsOfInterest = ['Asset does not exist or is not accessible']
+
+# Compose the arguments into lists that can be run via the subprocess module
+bashCommandList_Detect = [bashFunction_EarthEngine]+arglist_Detect
+bashCommandList_Delete = [bashFunction_EarthEngine]+arglist_Delete
+bashCommandList_ls = [bashFunction_EarthEngine]+arglist_ls
+bashCommandList_CreateCollection = [bashFunction_EarthEngine]+arglist_CreateCollection
+bashCommandList_CreateFolder = [bashFunction_EarthEngine]+arglist_CreateFolder
+
+####################################################################################################################################################################
+# Helper functions
+####################################################################################################################################################################
+# Function to convert GEE FC to pd.DataFrame. Not ideal as it's calling .getInfo(), but does the job
+def GEE_FC_to_pd(fc):
+    result = []
+
+    values = fc.toList(500000).getInfo()
+
+    BANDS = fc.first().propertyNames().getInfo()
+
+    if 'system:index' in BANDS: BANDS.remove('system:index')
+
+    for item in values:
+        values_item = item['properties']
+        row = [values_item[key] for key in BANDS]
+        result.append(row)
+
+    df = pd.DataFrame([item for item in result], columns = BANDS)
+    df.replace('None', np.nan, inplace = True)
+
+    return df
+
+# Add point coordinates to FC as properties
+def addLatLon(f):
+    lat = f.geometry().coordinates().get(1)
+    lon = f.geometry().coordinates().get(0)
+    return f.set(latString, lat).set(longString, lon)
+
+# R^2 function
+def coefficientOfDetermination(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+    # Compute the mean of the property of interest
+    propertyOfInterestMean = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).select([propertyOfInterest]).reduceColumns(ee.Reducer.mean(),[propertyOfInterest])).get('mean'))
+
+    # Compute the total sum of squares
+    def totalSoSFunction(f):
+        return f.set('Difference_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(propertyOfInterestMean).pow(ee.Number(2)))
+    totalSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(totalSoSFunction).select(['Difference_Squared']).reduceColumns(ee.Reducer.sum(),['Difference_Squared'])).get('sum'))
+
+    # Compute the residual sum of squares
+    def residualSoSFunction(f):
+        return f.set('Residual_Squared',ee.Number(ee.Feature(f).get(propertyOfInterest)).subtract(ee.Number(ee.Feature(f).get(propertyOfInterest_Predicted))).pow(ee.Number(2)))
+    residualSumOfSquares = ee.Number(ee.Dictionary(ee.FeatureCollection(fcOI).map(residualSoSFunction).select(['Residual_Squared']).reduceColumns(ee.Reducer.sum(),['Residual_Squared'])).get('sum'))
+
+    # Finalize the calculation
+    r2 = ee.Number(1).subtract(residualSumOfSquares.divide(totalSumOfSquares))
+
+    return ee.Number(r2)
+
+# RMSE function
+def RMSE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+    # Compute the squared difference between observed and predicted
+    def propDiff(f):
+        diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+        return f.set('diff', diff.pow(2))
+
+    # calculate RMSE from squared difference
+    rmse = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean')).sqrt()
+
+    return rmse
+
+# MAE function
+def MAE(fcOI,propertyOfInterest,propertyOfInterest_Predicted):
+    # Compute the absolute difference between observed and predicted
+    def propDiff(f):
+        diff = ee.Number(f.get(propertyOfInterest)).subtract(ee.Number(f.get(propertyOfInterest_Predicted)))
+
+        return f.set('diff', diff.abs())
+
+    # calculate MAE from squared difference
+    MAE = ee.Number(fcOI.map(propDiff).reduceColumns(ee.Reducer.mean(), ['diff']).get('mean'))
+
+    return MAE
+
+# Function to take a feature with a classifier of interest
+def computeCVAccuracyAndRMSE(featureWithClassifier):
+    # Pull the classifier from the feature
+    cOI = ee.Classifier(featureWithClassifier.get('c'))
+
+    # Get the model type
+    modelType = cOI.mode().getInfo()
+
+    # Create a function to map through the fold assignments and compute the overall accuracy
+    # for all validation folds
+    def computeAccuracyForFold(foldFeature):
+        # Organize the training and validation data
+
+        foldNumber = ee.Number(ee.Feature(foldFeature).get('Fold'))
+        trainingData_Random = fcOI.filterMetadata(cvFoldString_Random,'not_equals',foldNumber)
+        validationData_Random = fcOI.filterMetadata(cvFoldString_Random,'equals',foldNumber)
+
+        trainingData_Spatial = fcOI.filterMetadata(cvFoldString_Spatial,'not_equals',foldNumber)
+        validationData_Spatial = fcOI.filterMetadata(cvFoldString_Spatial,'equals',foldNumber)
+
+        # Train the classifier and classify the validation dataset
+        trainedClassifier_Random = cOI.train(trainingData_Random,classProperty,covariateList)
+        outputtedPropName_Random = classProperty+'_Predicted_Random'
+        classifiedValidationData_Random = validationData_Random.classify(trainedClassifier_Random,outputtedPropName_Random)
+
+        trainedClassifier_Spatial = cOI.train(trainingData_Spatial,classProperty,covariateList)
+        outputtedPropName_Spatial = classProperty+'_Predicted_Spatial'
+        classifiedValidationData_Spatial = validationData_Spatial.classify(trainedClassifier_Spatial,outputtedPropName_Spatial)
+
+        if modelType == 'CLASSIFICATION':
+            # Compute the overall accuracy of the classification
+            errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels)
+            overallAccuracy_Random = ee.Number(errorMatrix_Random.accuracy())
+
+            errorMatrix_Spatial = classifiedValidationData_Spatial.errorMatrix(classProperty,outputtedPropName_Spatial,categoricalLevels)
+            overallAccuracy_Spatial = ee.Number(errorMatrix_Spatial.accuracy())
+            return foldFeature.set('overallAccuracy_Random',overallAccuracy_Random).set('overallAccuracy_Spatial',overallAccuracy_Spatial)
+        
+        if modelType == 'REGRESSION':
+            # Compute accuracy metrics
+            r2ToSet_Random = coefficientOfDetermination(classifiedValidationData_Random,classProperty,outputtedPropName_Random)
+            rmseToSet_Random = RMSE(classifiedValidationData_Random,classProperty,outputtedPropName_Random)
+            maeToSet_Random = MAE(classifiedValidationData_Random,classProperty,outputtedPropName_Random)
+
+            r2ToSet_Spatial = coefficientOfDetermination(classifiedValidationData_Spatial,classProperty,outputtedPropName_Spatial)
+            rmseToSet_Spatial = RMSE(classifiedValidationData_Spatial,classProperty,outputtedPropName_Spatial)
+            maeToSet_Spatial = MAE(classifiedValidationData_Spatial,classProperty,outputtedPropName_Spatial)
+            return foldFeature.set('R2_Random',r2ToSet_Random).set('RMSE_Random', rmseToSet_Random).set('MAE_Random', maeToSet_Random)\
+                                .set('R2_Spatial',r2ToSet_Spatial).set('RMSE_Spatial', rmseToSet_Spatial).set('MAE_Spatial', maeToSet_Spatial)
+
+    # Compute the mean and std dev of the accuracy values of the classifier across all folds
+    accuracyFC = kFoldAssignmentFC.map(computeAccuracyForFold)
+
+    if modelType == 'REGRESSION':
+        meanAccuracy_Random = accuracyFC.aggregate_mean('R2_Random')
+        tsdAccuracy_Random = accuracyFC.aggregate_total_sd('R2_Random')
+        meanAccuracy_Spatial = accuracyFC.aggregate_mean('R2_Spatial')
+        tsdAccuracy_Spatial = accuracyFC.aggregate_total_sd('R2_Spatial')
+
+        # Calculate mean and std dev of RMSE
+        RMSEvals_Random = accuracyFC.aggregate_array('RMSE_Random')
+        RMSEvalsSquared_Random = RMSEvals_Random.map(lambda f: ee.Number(f).multiply(f))
+        sumOfRMSEvalsSquared_Random = RMSEvalsSquared_Random.reduce(ee.Reducer.sum())
+        meanRMSE_Random = ee.Number.sqrt(ee.Number(sumOfRMSEvalsSquared_Random).divide(k))
+        RMSEvals_Spatial = accuracyFC.aggregate_array('RMSE_Spatial')
+        RMSEvalsSquared_Spatial = RMSEvals_Spatial.map(lambda f: ee.Number(f).multiply(f))
+        sumOfRMSEvalsSquared_Spatial = RMSEvalsSquared_Spatial.reduce(ee.Reducer.sum())
+        meanRMSE_Spatial = ee.Number.sqrt(ee.Number(sumOfRMSEvalsSquared_Spatial).divide(k))
+
+        RMSEdiff_Random = accuracyFC.aggregate_array('RMSE_Random').map(lambda f: ee.Number(ee.Number(f).subtract(meanRMSE_Random)).pow(2))
+        sumOfRMSEdiff_Random = RMSEdiff_Random.reduce(ee.Reducer.sum())
+        sdRMSE_Random = ee.Number.sqrt(ee.Number(sumOfRMSEdiff_Random).divide(k))
+        RMSEdiff_Spatial = accuracyFC.aggregate_array('RMSE_Spatial').map(lambda f: ee.Number(ee.Number(f).subtract(meanRMSE_Spatial)).pow(2))
+        sumOfRMSEdiff_Spatial = RMSEdiff_Spatial.reduce(ee.Reducer.sum())
+        sdRMSE_Spatial = ee.Number.sqrt(ee.Number(sumOfRMSEdiff_Spatial).divide(k))
+
+        # Calculate mean and std dev of MAE
+        meanMAE_Random = accuracyFC.aggregate_mean('MAE_Random')
+        tsdMAE_Random= accuracyFC.aggregate_total_sd('MAE_Random')
+        meanMAE_Spatial = accuracyFC.aggregate_mean('MAE_Spatial')
+        tsdMAE_Spatial= accuracyFC.aggregate_total_sd('MAE_Spatial')
+
+        # Compute the feature to return
+        featureToReturn = featureWithClassifier.select(['cName']).set('Mean_R2_Random',meanAccuracy_Random,'StDev_R2_Random',tsdAccuracy_Random, 'Mean_RMSE_Random',meanRMSE_Random,'StDev_RMSE_Random',sdRMSE_Random, 'Mean_MAE_Random',meanMAE_Random,'StDev_MAE_Random',tsdMAE_Random)\
+                                                                .set('Mean_R2_Spatial',meanAccuracy_Spatial,'StDev_R2_Spatial',tsdAccuracy_Spatial, 'Mean_RMSE_Spatial',meanRMSE_Spatial,'StDev_RMSE_Spatial',sdRMSE_Spatial, 'Mean_MAE_Spatial',meanMAE_Spatial,'StDev_MAE_Spatial',tsdMAE_Spatial)
+
+    if modelType == 'CLASSIFICATION':
+        accuracyFC_Random = kFoldAssignmentFC.map(computeAccuracyForFold)
+        meanAccuracy_Random = accuracyFC_Random.aggregate_mean('overallAccuracy_Random')
+        tsdAccuracy_Random = accuracyFC_Random.aggregate_total_sd('overallAccuracy_Random')
+        accuracyFC_Spatial = kFoldAssignmentFC.map(computeAccuracyForFold)
+        meanAccuracy_Spatial = accuracyFC_Spatial.aggregate_mean('overallAccuracy_Spatial')
+        tsdAccuracy_Spatial = accuracyFC_Spatial.aggregate_total_sd('overallAccuracy_Spatial')
+
+        # Compute the feature to return
+        featureToReturn = featureWithClassifier.select(['cName']).set('Mean_overallAccuracy_Random',meanAccuracy_Random,'StDev_overallAccuracy_Random',tsdAccuracy_Random)\
+                                                                .set('Mean_overallAccuracy_Spatial',meanAccuracy_Spatial,'StDev_overallAccuracy_Spatial',tsdAccuracy_Spatial)  
+
+    return featureToReturn
+
+####################################################################################################################################################################
+# Data processing
+####################################################################################################################################################################
+try:
+    # try whether fcOI is present
+    fcOI = ee.FeatureCollection(assetIDForCVAssignedColl)
+    print(fcOI.size().getInfo(), 'features in', assetIDForCVAssignedColl)
+
+    preppedCollection_wSpatialFolds = pd.read_csv(holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv')
+
+except Exception as e:
+    print(e)
+
+##################################################################################################################################################################
+# Hyperparameter tuning
+##################################################################################################################################################################
+fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+
+# Define hyperparameters for grid search
+varsPerSplit_list = list(range(4,14,2))
+leafPop_list = list(range(2,14,2))
+
+classifierListRegression = []
+# Create list of classifiers for regression
+for vps in varsPerSplit_list:
+    for lp in leafPop_list:
+
+        model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + '_REGRESSION'
+
+        rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
+        numberOfTrees = nTrees,
+        variablesPerSplit = vps,
+        minLeafPopulation = lp,
+        bagFraction = 0.632,
+        seed = 42
+        ).setOutputMode('REGRESSION'))
+
+        classifierListRegression.append(rf)
+
+classifierListClassification = []
+# Create list of classifiers for classification
+for vps in varsPerSplit_list:
+    for lp in leafPop_list:
+
+        model_name = classProperty + '_rf_VPS' + str(vps) + '_LP' + str(lp) + 'CLASSIFICATION'
+
+        rf = ee.Feature(ee.Geometry.Point([0,0])).set('cName',model_name,'c',ee.Classifier.smileRandomForest(
+        numberOfTrees = nTrees,
+        variablesPerSplit = vps,
+        minLeafPopulation = lp,
+        bagFraction = 0.632,
+        seed = 42
+        ).setOutputMode('CLASSIFICATION'))
+
+        classifierListClassification.append(rf)
+
+# # If grid search was not performed yet:
+# Make a feature collection from the k-fold assignment list
+kFoldAssignmentFC = ee.FeatureCollection(ee.List(kList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('Fold',n)))
+
+finished_models_regression_singlemodel = []
+
+# Addition for revision; check if single regression model does well
+try:
+    grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_revisions_singlemodel_hyperparameter_tuning')
+    print(grid_search_resultsRegression.size().getInfo())
+
+except Exception as e:
+    try:
+        # Create list of finished models
+        finished_models_regression_singlemodel = subprocess.run(bashCommandList_ls+['users/'+usernameFolderString+'/'+projectFolder+'/_revisions_singlemodel_hyperparameter_tuning/'], stdout=subprocess.PIPE).stdout.splitlines()
+        finished_models_regression_singlemodel = [model.decode('ascii').split('/')[-1] for model in finished_models_regression_singlemodel]
+        
+    except Exception as e:
+        classDfRegression = pd.DataFrame(columns = ['Mean_R2', 'StDev_R2','Mean_RMSE', 'StDev_RMSE','Mean_MAE', 'StDev_MAE', 'cName'])
+
+    # Perform model testing for remaining hyperparameter settings
+    for rf in classifierListRegression:
+        if rf.get('cName').getInfo() in finished_models_regression_singlemodel:
+            print('Model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression), 'already finished')
+        else:
+            print('Testing model', classifierListRegression.index(rf), 'out of total of', len(classifierListRegression))
+            fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)#.filter(ee.Filter.neq(classProperty, 0))
+            accuracy_feature = ee.Feature(computeCVAccuracyAndRMSE(rf))
+            accuracy_featureExport = ee.batch.Export.table.toAsset(
+                collection = ee.FeatureCollection([accuracy_feature]),
+                description = classProperty+rf.get('cName').getInfo(),
+                assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/revisions_singlemodel_hyperparameter_tuning/'+rf.get('cName').getInfo())
+            accuracy_featureExport.start()
+
+    # !! Break and wait
+    count = 1
+    while count >= 1:
+        taskList = [str(i) for i in ee.batch.Task.list()]
+        subsetList = [s for s in taskList if classProperty in s]
+        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+        count = len(subsubList)
+        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
+        time.sleep(normalWaitTime)
+    print('Moving on...')
+
+# Fetch FC from GEE
+grid_search_resultsRegression = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListRegression]).flatten()
+classDfRegression = GEE_FC_to_pd(grid_search_resultsRegression)
+grid_search_resultsRegression_singlemodel = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/revisions_singlemodel_hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListRegression]).flatten()
+classDfRegression_singlemodel = GEE_FC_to_pd(grid_search_resultsRegression_singlemodel)
+grid_search_resultsClassification = ee.FeatureCollection([ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/hyperparameter_tuning/'+rf.get('cName').getInfo()) for rf in classifierListClassification]).flatten()
+classDfClassification = GEE_FC_to_pd(grid_search_resultsClassification)
+
+# Sort values
+classDfSortedRegression = classDfRegression.sort_values([sort_acc_prop], ascending = False)
+classDfSortedRegression_singlemodel = classDfRegression_singlemodel.sort_values([sort_acc_prop], ascending = False)
+classDfSortedRegression_singlemodel.to_csv(outputFolder+'/'+today+'_'+classProperty+'revisions_singlemodel_hyperparameter_tuning.csv')
+classDfSortedClassification = classDfClassification.sort_values(['Mean_overallAccuracy_Random'], ascending = False)
+
+# Get top model name
+bestModelNameRegression = grid_search_resultsRegression.limit(1, sort_acc_prop, False).first().get('cName')
+bestMOdelNameRegression_singlemodel = grid_search_resultsRegression_singlemodel.limit(1, sort_acc_prop, False).first().get('cName')
+bestModelNameClassification = grid_search_resultsClassification.limit(1, 'Mean_overallAccuracy_Random', False).first().get('cName')
+
+# Get top 10 models
+top_10ModelsRegression = grid_search_resultsRegression.limit(10, sort_acc_prop, False).aggregate_array('cName')
+top_10ModelsRegression_singlemodel = grid_search_resultsRegression_singlemodel.limit(10, sort_acc_prop, False).aggregate_array('cName')
+top_10ModelsClassification = grid_search_resultsClassification.limit(10, 'Mean_overallAccuracy_Random', False).aggregate_array('cName')
+
+print('Moving on...')
+
+##################################################################################################################################################################
+# Predicted - Observed
+##################################################################################################################################################################
+fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+
+for n in list(range(0,10)):
+    modelNameRegression = top_10ModelsRegression.get(n)
+    modelNameClassification = top_10ModelsClassification.get(n)
+
+    # Load the best model from the classifier list
+    classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+    classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+
+    # Train the classifier with the collection
+    # REGRESSION
+    fcOI_forRegression = fcOI.filter(ee.Filter.neq(classProperty, 0))
+    trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+
+    # Classification
+    fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+    trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+
+    # Classify the FC
+    def classifyFunction(f):
+        classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Regressed').first()
+        classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
+
+        featureToReturn = classfiedRegression.set(classProperty+'_Classified', classfiedClassification.get(classProperty+'_Classified'))
+
+        # Calculate final predicted value as product of classification and regression
+        featureToReturn = featureToReturn.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
+        return featureToReturn
+
+    # Classify fcOI
+    predObs = fcOI.map(classifyFunction)
+
+    # Add coordinates to FC
+    predObs = predObs.map(addLatLon)
+
+    # back-log transform predicted and observed values
+    if log_transform_classProperty == True:
+        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+        predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
+
+    # Add residuals to FC
+    predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+
+    # Export to Assets
+    predObsexport = ee.batch.Export.table.toAsset(
+        collection = predObs_wResiduals,
+        description = classProperty+'_tmp_review_zeroflationtest_dualmodel_'+str(n),
+        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_tmp_review_zeroflationtest_dualmodel_'+str(n)
+    )
+    # predObsexport.start()
+
+# Without zero inflation
+for n in list(range(0,10)):
+    modelNameRegression = top_10ModelsRegression.get(n)
+    # modelNameClassification = top_10ModelsClassification.get(n)
+
+    # Load the best model from the classifier list
+    classifierRegression = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', modelNameRegression).first()).get('c'))
+    # classifierClassification = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListClassification).filterMetadata('cName', 'equals', modelNameClassification).first()).get('c'))
+
+    # Train the classifier with the collection
+    # REGRESSION
+    fcOI_forRegression = fcOI#.filter(ee.Filter.neq(classProperty, 0))
+    trainedClassiferRegression = classifierRegression.train(fcOI_forRegression, classProperty, covariateList)
+
+    # Classification
+    # fcOI_forClassification = fcOI.map(lambda f: f.set(classProperty+'_forClassification', ee.Number(f.get(classProperty)).divide(f.get(classProperty)))) # train classifier on 0 (classProperty == 0) or 1 (classProperty != 0)
+    # trainedClassiferClassification = classifierClassification.train(fcOI_forClassification, classProperty+'_forClassification', covariateList)
+
+    # Classify the FC
+    def classifyFunction(f):
+        classfiedRegression = ee.FeatureCollection([f]).classify(trainedClassiferRegression,classProperty+'_Predicted').first()
+        # classfiedClassification = ee.FeatureCollection([f]).classify(trainedClassiferClassification,classProperty+'_Classified').first()
+
+        featureToReturn = classfiedRegression
+
+        # Calculate final predicted value as product of classification and regression
+        featureToReturn = featureToReturn#.set(classProperty+'_Predicted', ee.Number(featureToReturn.get(classProperty+'_Classified')).multiply(ee.Number(featureToReturn.get(classProperty+'_Regressed'))))
+        return featureToReturn
+
+    # Classify fcOI
+    predObs = fcOI.map(classifyFunction)
+
+    # Add coordinates to FC
+    predObs = predObs.map(addLatLon)
+
+    # back-log transform predicted and observed values
+    if log_transform_classProperty == True:
+        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+        # predObs = predObs.map(lambda f: f.set(classProperty+'_Regressed', ee.Number(f.get(classProperty+'_Regressed')).exp().subtract(1)))
+
+    # Add residuals to FC
+    predObs_wResiduals = predObs.map(lambda f: f.set('Residual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty))))
+
+    # Export to Assets
+    predObsexport = ee.batch.Export.table.toAsset(
+        collection = predObs_wResiduals,
+        description = classProperty+'_tmp_review_zeroinflationtest_singlemodel_'+str(n),
+        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_tmp_review_zeroinflationtest_singlemodel_'+str(n)
+    )
+    # predObsexport.start()
+
+# !! Break and wait
+count = 1
+while count >= 1:
+    taskList = [str(i) for i in ee.batch.Task.list()]
+    subsetList = [s for s in taskList if classProperty in s]
+    subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+    count = len(subsubList)
+    print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+    time.sleep(normalWaitTime)
+print('Moving on...')
+
+predObs_list = [ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_tmp_review_zeroinflationtest_singlemodel_'+str(n)) for n in list(range(0,10))] 
+
+# Map GEE_FC_to_pd to each element in the list
+predObs_df = pd.concat([GEE_FC_to_pd(fc) for fc in predObs_list])
+
+# Group by sample ID to return mean across ensemble prediction
+# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+
+predObs_df.to_csv('output/'+today+'_'+classProperty+'_tmp_review_zeroinflationtest_singlemodel.csv')
+
+
+predObs_list = [ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_tmp_review_zeroflationtest_dualmodel_'+str(n)) for n in list(range(0,10))] 
+
+# Map GEE_FC_to_pd to each element in the list
+predObs_df = pd.concat([GEE_FC_to_pd(fc) for fc in predObs_list])
+
+# Group by sample ID to return mean across ensemble prediction
+# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+
+predObs_df.to_csv('output/'+today+'_'+classProperty+'_tmp_review_zeroflationtest_dualmodel.csv')

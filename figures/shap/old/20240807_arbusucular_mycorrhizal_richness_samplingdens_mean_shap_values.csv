@@ -1,0 +1,24 @@
+Feature,Mean SHAP Value
+Human Development,2.904760893067477
+SOC at 5cm,2.862783485629054
+Project Variables,2.662423170157781
+Potential Evapotranspiration,1.8156477179674668
+Annual Mean Temperature,1.6700632906486717
+Max Temperature of Warmest Month,1.2672732528557031
+Precipitation Seasonality,0.7952960754382286
+Elevation,0.6671342927031095
+Sand Content at 5cm,0.6373077659261398
+Annual Precipitation,0.4249546041414395
+Soil pH at 5cm,0.4040545059310803
+Aboveground Biomass,0.34702612604864763
+Slope,0.33568334808185024
+Aspect Sine,0.3300183118973181
+Net Primary Productivity,0.3132533633924418
+Homogeneity EVI,0.28451312582399235
+Correlation EVI,0.2521940675281956
+Burnt Areas Probability,0.24990491212615407
+Coef. of Var. EVI,0.2474856789569844
+Population Density,0.2473665396982674
+Aspect Cosine,0.21103880113061577
+Topo. Position Index,0.20461043477781718
+Depth to Bedrock,0.18257124784544068
