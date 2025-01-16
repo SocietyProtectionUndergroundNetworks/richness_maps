@@ -1,4 +1,4 @@
-./old
+./old/
 ./.RData
-./data/old
-./spatial_predictors
+./data/old/
+./spatial_predictors/
