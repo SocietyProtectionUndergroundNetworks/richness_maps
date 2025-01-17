@@ -25,3 +25,4 @@ Reclustering/./old/20221117_GFv4_richness_rarefied_sampled.csv
 ./data/old/20240610_ECM_sampled_outliersRemoved_onehot.csv
 ./data/old/20230920_EM_richness_rarefied_sampled.csv
 ./data/old/ectomycorrhizal_richness_bootstrapSamples_wMEM.csv
+data/rwr_bootstrapSamples.csv
