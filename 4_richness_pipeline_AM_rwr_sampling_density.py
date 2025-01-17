@@ -33,7 +33,7 @@ classProperty = 'rwr'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_10/' + guild + '_rwr_wSamplingDensity'
+projectFolder = '000_SPUN_GFv4_12/' + guild + '_rwr_wSamplingDensity'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -96,13 +96,24 @@ covariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'plant_diversity',
+'climate_stability_index'
 ]
 
-compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+plant_diversity = ee.Image('projects/crowtherlab/johan/SPUN_layers/plant_SR_Ensemble_rasterized').rename('plant_diversity')
+climate_stability_index = ee.Image('projects/crowtherlab/johan/SPUN_layers/csi_past').rename('climate_stability_index')
 
-# amf_sampling_density = ee.Image('users/johanvandenhoogen/000_SPUN_GFv4_10/amf_sampleintensity_5degrees_scaled').rename('amf_sampling_density')
-amf_sampling_density = ee.Image(1).rename('amf_sampling_density')
+composite = ee.Image.cat([
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_bioComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_climateComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_geoComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_processComposite_30ArcSec"),
+		])
 
+# Add plant diversity and climate stability index to composite and reproject to composite projection
+compositeOfInterest = composite.addBands(plant_diversity).addBands(climate_stability_index).reproject(composite.projection()) 
+
+# Project-specific covariates
 project_vars = [
 'sequencing_platform454Roche',
 'sequencing_platformIllumina',
@@ -125,11 +136,15 @@ project_vars = [
 'primersNS31_AM1',
 'primersNS31_AML2',
 'primersWANDA_AML2',
+'area_sampled',
+'extraction_dna_mass',
+'amf_sampling_density'
 ]
-                
-covariateList = covariateList + project_vars + ['amf_sampling_density']
 
-####################################################################################################################################################################
+# Add project-specific covariates to covariate list
+covariateList = covariateList + project_vars
+
+###################################################################################################################################################################
 # Cross validation settings
 ####################################################################################################################################################################
 # Set k for k-fold CV
@@ -159,14 +174,14 @@ else:
     sort_acc_prop = sort_acc_prop + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
-titleOfCSVWithCVAssignments = guild+classProperty+"_training_data"
+titleOfCSVWithCVAssignments = today + "_" + guild + "_" + classProperty + "_training_data_wSamplingDensity"
 
 # Asset ID of uploaded dataset after processing
 assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
 
 # Write the name of a local staging area folder for outputted CSV's
 holdingFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/data/'
-outputFolder = '/Users/johanvandenhoogen/SPUN/richness_maps/output'
+outputFolder = '/Users/johanvandenhooge n/SPUN/richness_maps/output'
 
 # Create directory to hold training data
 Path(holdingFolder).mkdir(parents=True, exist_ok=True)
@@ -224,7 +239,6 @@ strataDict = {
 
 # Specify main bash functions being used
 bashFunction_EarthEngine = '/Users/johanvandenhoogen/miniconda3/envs/ee/bin/earthengine'
-# bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
 bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
 
 # Specify the arguments to these functions
@@ -352,7 +366,9 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
         classifiedValidationData_Spatial = validationData_Spatial.classify(trainedClassifier_Spatial,outputtedPropName_Spatial)
 
         if modelType == 'CLASSIFICATION':
-            # Compute the overall accuracy of the classification
+            # Compute the categorical levels of the class property
+            categoricalLevels = ee.Dictionary(ee.FeatureCollection(fcOI).reduceColumns(ee.Reducer.frequencyHistogram(),[classProperty])).keys()    # Compute the overall accuracy of the classification
+            
             errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels)
             overallAccuracy_Random = ee.Number(errorMatrix_Random.accuracy())
 
@@ -468,24 +484,26 @@ try:
     fcOI = ee.FeatureCollection(assetIDForCVAssignedColl)
     print(fcOI.size().getInfo(), 'features in', assetIDForCVAssignedColl)
 
-    preppedCollection_wSpatialFolds = pd.read_csv(holdingFolder+'/'+guild+titleOfCSVWithCVAssignments+'.csv')
+    preppedCollection_wSpatialFolds = pd.read_csv(holdingFolder+'/'+titleOfCSVWithCVAssignments+'.csv')
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20240610_AMF_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20250116_AMF_rwr_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
-    # rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
-
-    rawPointCollection.rename(columns={'sample_ID': 'sample_id'}, inplace=True)
+    rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 123).reset_index(drop=True)
 
     # Remove duplicates / pixel aggregate
     preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
     print('Number of aggregated pixels', preppedCollection.shape[0])
+
+    # Replace NA values in columns area_sampled and extraction_dna_mass with reference values; 100 and 0.5 respectively
+    preppedCollection['area_sampled'] = preppedCollection['area_sampled'].fillna(100)
+    preppedCollection['extraction_dna_mass'] = preppedCollection['extraction_dna_mass'].fillna(0.5)
 
     # Drop NAs
     preppedCollection = preppedCollection.dropna(how='any')
@@ -546,7 +564,6 @@ except Exception as e:
 
     # Write the CSV to disk 
     preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
-
 
     try:
         # try whether fcOI is present
@@ -674,7 +691,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+guild+'_'+classProperty+'_grid_search_results_wSamplingDensity.csv', index=False)
+classDfSorted.to_csv('output/'+today+"_"+guild+"_"+classProperty+'_grid_search_results_wSamplingDensity.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
@@ -766,7 +783,7 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_sampling_density_pred_obs.csv', index=False)
+predObs_df.to_csv('output/'+today+"_"+guild+'_'+classProperty+'_pred_obs_wSamplingDensity.csv')
 
 #################################################################################################################################################################
 # Classify image
@@ -793,6 +810,9 @@ primersNS1_NS41_then_AML1_AML2 = ee.Image.constant(0)
 primersNS31_AM1 = ee.Image.constant(0)
 primersNS31_AML2 = ee.Image.constant(0)
 primersWANDA_AML2 = ee.Image.constant(0)
+area_sampled = ee.Image.constant(100)
+extraction_dna_mass = ee.Image.constant(0.5)
+amf_sampling_density = ee.Image(1)
 
 constant_imgs = ee.ImageCollection.fromImages([
     sequencing_platform454Roche,
@@ -816,6 +836,9 @@ constant_imgs = ee.ImageCollection.fromImages([
     primersNS31_AM1,
     primersNS31_AML2,
     primersWANDA_AML2,
+    area_sampled,
+    extraction_dna_mass,
+    amf_sampling_density
 ]).toBands().rename([
     'sequencing_platform454Roche',
     'sequencing_platformIllumina',
@@ -838,6 +861,9 @@ constant_imgs = ee.ImageCollection.fromImages([
     'primersNS31_AM1',
     'primersNS31_AML2',
     'primersWANDA_AML2',
+    'area_sampled',
+    'extraction_dna_mass',
+    'amf_sampling_density'
 ])
 
 def finalImageClassification(compositeImg):
@@ -871,7 +897,7 @@ def finalImageClassification(compositeImg):
     return classifiedImage
 
 # Create appropriate composite image with bands to use
-compositeToClassify = compositeOfInterest.addBands(constant_imgs).addBands(amf_sampling_density).select(covariateList).reproject(compositeOfInterest.projection())
+compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
 classifiedImage = finalImageClassification(compositeToClassify)
 
 # if log_transform_classProperty == True:
@@ -891,117 +917,111 @@ classifiedImage = finalImageClassification(compositeToClassify)
 
 ##################################################################################################################################################################
 # Variable importance metrics
-# ##################################################################################################################################################################
-# if ensemble == False:
-#     classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+##################################################################################################################################################################
+if ensemble == False:
+    classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-#     # Train the classifier with the collection
-#     trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+    # Train the classifier with the collection
+    trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-#     # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-#     featureImportances = trainedClassifer.explain().get('importance').getInfo()
+    # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+    featureImportances = trainedClassifer.explain().get('importance').getInfo()
 
-#     featureImportances = pd.DataFrame(featureImportances.items(),
-#                                         columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-#                                                                                                 ascending=False)
+    featureImportances = pd.DataFrame(featureImportances.items(),
+                                        columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+                                                                                                ascending=False)
 
-#     # Scale values
-#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
-#     featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
+    # Scale values
+    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] - featureImportances['Feature_Importance'].min()
+    featureImportances['Feature_Importance'] = featureImportances['Feature_Importance'] / featureImportances['Feature_Importance'].max()
 
-# if ensemble == True:
-#     # Instantiate empty dataframe
-#     featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
+if ensemble == True:
+    # Instantiate empty dataframe
+    featureImportances = pd.DataFrame(columns=['Variable', 'Feature_Importance'])
 
-#     for i in list(range(0,10)):
-#         classifierName = top_10Models.get(i)
-#         classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+    for i in list(range(0,10)):
+        classifierName = top_10Models.get(i)
+        classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
-#         # Train the classifier with the collection
-#         trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
+        # Train the classifier with the collection
+        trainedClassifer = classifier.train(fcOI, classProperty, covariateList)
 
-#         # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
-#         featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
-#         featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
-#                                             columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
-#                                                                                                     ascending=False)
-#         # Scale values
-#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
-#         featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
+        # Get the feature importance from the trained classifier and write to a .csv file and as a bar plot as .png file
+        featureImportancesToAdd = trainedClassifer.explain().get('importance').getInfo()
+        featureImportancesToAdd = pd.DataFrame(featureImportancesToAdd.items(),
+                                            columns=['Variable', 'Feature_Importance']).sort_values(by='Feature_Importance',
+                                                                                                    ascending=False)
+        # Scale values
+        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] - featureImportancesToAdd['Feature_Importance'].min()
+        featureImportancesToAdd['Feature_Importance'] = featureImportancesToAdd['Feature_Importance'] / featureImportancesToAdd['Feature_Importance'].max()
 
-#         featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
+        featureImportances = pd.concat([featureImportances, featureImportancesToAdd])
 
-#     featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
+    featureImportances = pd.DataFrame(featureImportances.groupby('Variable').mean().to_records())
 
-# # Write to csv
-# featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
-# featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
+# Write to csv
+featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
+featureImportances.to_csv('output/'+today+"_"+guild+'_'+classProperty+'_featureImportances_wSamplingDensity.csv')
 
-# # Create and save plot
-# plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
-#                                 title='Feature Importances')
-# fig = plt.get_figure()
-# fig.savefig('output/'+today+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+# Create and save plot
+plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
+                                title='Feature Importances')
+fig = plt.get_figure()
+fig.savefig('output/'+today+"_"+guild+'_'+classProperty+'_FeatureImportances_wSamplingDensity.png', bbox_inches='tight')
 
-# print('Variable importance metrics complete! Moving on...')
+print('Variable importance metrics complete! Moving on...')
 
 ##################################################################################################################################################################
 # Bootstrapping
 ##################################################################################################################################################################
-try:
-    # Path to bootstrapped samples
-    bootstrapFc = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+bootstrapSamples)
-    print(bootstrapFc.size().getInfo())
+# Input the number of points to use for each bootstrap model: equal to number of observations in training dataset
+bootstrapModelSize = preppedCollection_wSpatialFolds.shape[0]
 
-except Exception as e:
-    # Input the number of points to use for each bootstrap model: equal to number of observations in training dataset
-    bootstrapModelSize = preppedCollection_wSpatialFolds.shape[0]
+# Run a for loop to create multiple bootstrap iterations and upload them to the Google Cloud Storage Bucket
+# Create an empty list to store all of the file name strings being uploaded (for later use)
+# fileNameList = []
+stratSample = preppedCollection_wSpatialFolds.head(0)
 
-    # Run a for loop to create multiple bootstrap iterations and upload them to the Google Cloud Storage Bucket
-    # Create an empty list to store all of the file name strings being uploaded (for later use)
-    # fileNameList = []
-    stratSample = preppedCollection_wSpatialFolds.head(0)
+for n in seedsToUseForBootstrapping:
+    # Perform the subsetting
+    sampleToConcat = preppedCollection_wSpatialFolds.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
+    sampleToConcat['bootstrapIteration'] = n
+    stratSample = pd.concat([stratSample, sampleToConcat])
 
-    for n in seedsToUseForBootstrapping:
-        # Perform the subsetting
-        sampleToConcat = preppedCollection_wSpatialFolds.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
-        sampleToConcat['bootstrapIteration'] = n
-        stratSample = pd.concat([stratSample, sampleToConcat])
+# Format the title of the CSV and export it to a holding location
+fullLocalPath = holdingFolder+'/'+bootstrapSamples+'.csv'
+stratSample.to_csv(holdingFolder+'/'+bootstrapSamples+'.csv',index=False)
 
-    # Format the title of the CSV and export it to a holding location
-    fullLocalPath = holdingFolder+'/'+guild+'_'+bootstrapSamples+'.csv'
-    stratSample.to_csv(fullLocalPath,index=False)
+# Format the bash call to upload the files to the Google Cloud Storage bucket
+gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
+subprocess.run(gsutilBashUploadList)
+print(bootstrapSamples+' uploaded to a GCSB!')
 
-    # Format the bash call to upload the files to the Google Cloud Storage bucket
-    gsutilBashUploadList = [bashFunctionGSUtil]+arglist_preGSUtilUploadFile+[fullLocalPath]+[formattedBucketOI]
-    subprocess.run(gsutilBashUploadList)
-    print(bootstrapSamples+' uploaded to a GCSB!')
+# Wait for the GSUTIL uploading process to finish before moving on
+while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in [bootstrapSamples]):
+    print('Not everything is uploaded...')
+    time.sleep(5)
+print('Everything is uploaded moving on...')
 
-    # Wait for the GSUTIL uploading process to finish before moving on
-    while not all(x in subprocess.run([bashFunctionGSUtil,'ls',formattedBucketOI],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in [bootstrapSamples]):
-        print('Not everything is uploaded...')
-        time.sleep(5)
-    print('Everything is uploaded moving on...')
+# Upload the file into Earth Engine as a table asset
+assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+bootstrapSamples
+earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIDForCVAssignedColl]+[formattedBucketOI+'/'+bootstrapSamples+'.csv']+arglist_postEEUploadTable
+subprocess.run(earthEngineUploadTableCommands)
+print('Upload to EE queued!')
 
-    # Upload the file into Earth Engine as a table asset
-    assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+bootstrapSamples
-    earthEngineUploadTableCommands = [bashFunction_EarthEngine]+arglist_preEEUploadTable+[assetIDStringPrefix+assetIDForCVAssignedColl]+[formattedBucketOI+'/'+guild+'_'+bootstrapSamples+'.csv']+arglist_postEEUploadTable
-    subprocess.run(earthEngineUploadTableCommands)
-    print('Upload to EE queued!')
+# Wait for a short period to ensure the command has been received by the server
+time.sleep(normalWaitTime/2)
 
-    # Wait for a short period to ensure the command has been received by the server
-    time.sleep(normalWaitTime/2)
-
-    # !! Break and wait
-    count = 1
-    while count >= 1:
-        taskList = [str(i) for i in ee.batch.Task.list()]
-        subsetList = [s for s in taskList if classProperty in s]
-        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-        count = len(subsubList)
-        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
-        time.sleep(normalWaitTime)
-    print('Moving on...')
+# !! Break and wait
+count = 1
+while count >= 1:
+    taskList = [str(i) for i in ee.batch.Task.list()]
+    subsetList = [s for s in taskList if classProperty in s]
+    subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+    count = len(subsubList)
+    print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
+    time.sleep(normalWaitTime)
+print('Moving on...')
 
 # Load the best model from the classifier list
 classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
@@ -1248,7 +1268,7 @@ else:
     coefOfVarImage.rename(classProperty+'_Bootstrapped_coefOfVar'),
     univariate_int_ext_image.rename('univariate_pct_int_ext'),
     PCA_int_ext.rename('PCA_pct_int_ext'))
-
+    
 FinalImageExport = ee.batch.Export.image.toAsset(
     image = finalImageToExport.toFloat(),
     description = classProperty+'_Bootstrapped_MultibandImage',
@@ -1266,13 +1286,16 @@ print('Map exports started! Moving on...')
 ##################################################################################################################################################################
 # Spatial Leave-One-Out cross validation
 ##################################################################################################################################################################
-assetID_SLOOCV = 'users/'+usernameFolderString+'/'+projectFolder+'/'+'sLOOCV'
-if any(x in subprocess.run(bashCommandList_Detect+[assetID_SLOOCV],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
+assetIDToCreate_Folder = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv'
+if any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest) == False:
     pass
 else:
+    # perform the folder creation
+    print(assetIDToCreate_Folder,'being created...')
+
     # Create the folder within Earth Engine
-    subprocess.run(bashCommandList_CreateFolder+[assetID_SLOOCV])
-    while any(x in subprocess.run(bashCommandList_Detect+[assetID_SLOOCV],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
+    subprocess.run(bashCommandList_CreateFolder+[assetIDToCreate_Folder])
+    while any(x in subprocess.run(bashCommandList_Detect+[assetIDToCreate_Folder],stdout=subprocess.PIPE).stdout.decode('utf-8') for x in stringsOfInterest):
         print('Waiting for asset to be created...')
         time.sleep(normalWaitTime)
     print('Asset created!')
@@ -1295,8 +1318,6 @@ buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 
 # Set number of repetitions
 n_reps = 10
 nList = list(range(0,n_reps))
-
-fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
 n_points = 1000
 
@@ -1401,7 +1422,7 @@ for rep in nList:
         bloo_cv_fc_export = ee.batch.Export.table.toAsset(
             collection = sloo_cv,
             description = classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer),
-            assetId = assetID_SLOOCV+'/'+classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer)+'_rep_'+str(rep),
+            assetId = 'projects/crowtherlab/johan/SPUN/AM_sloo_cv/'+classProperty+'_sloo_cv_results_wExtrapolation_'+str(buffer)+'_rep_'+str(rep),
         )
 
         bloo_cv_fc_export.start()

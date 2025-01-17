@@ -33,7 +33,7 @@ classProperty = 'rwr'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_10/' + guild + '_rwr'
+projectFolder = '000_SPUN_GFv4_12/' + guild + '_rwr'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -96,10 +96,24 @@ covariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'plant_diversity',
+'climate_stability_index'
 ]
 
-compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+plant_diversity = ee.Image('projects/crowtherlab/johan/SPUN_layers/plant_SR_Ensemble_rasterized').rename('plant_diversity')
+climate_stability_index = ee.Image('projects/crowtherlab/johan/SPUN_layers/csi_past').rename('climate_stability_index')
 
+composite = ee.Image.cat([
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_bioComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_climateComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_geoComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_processComposite_30ArcSec"),
+		])
+
+# Add plant diversity and climate stability index to composite and reproject to composite projection
+compositeOfInterest = composite.addBands(plant_diversity).addBands(climate_stability_index).reproject(composite.projection()) 
+
+# Project-specific covariates
 project_vars = [
 'sequencing_platform454Roche',
 'sequencing_platformIllumina',
@@ -122,9 +136,12 @@ project_vars = [
 'primersNS31_AM1',
 'primersNS31_AML2',
 'primersWANDA_AML2',
+'area_sampled',
+'extraction_dna_mass'
 ]
 
-covariateList = covariateList + project_vars 
+# Add project-specific covariates to covariate list
+covariateList = covariateList + project_vars
 
 ####################################################################################################################################################################
 # Cross validation settings
@@ -156,7 +173,7 @@ else:
     sort_acc_prop = sort_acc_prop + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
-titleOfCSVWithCVAssignments = classProperty+"_training_data"
+titleOfCSVWithCVAssignments = today + "_" + guild + "_" + classProperty+"_training_data"
 
 # Asset ID of uploaded dataset after processing
 assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
@@ -221,7 +238,6 @@ strataDict = {
 
 # Specify main bash functions being used
 bashFunction_EarthEngine = '/Users/johanvandenhoogen/miniconda3/envs/ee/bin/earthengine'
-# bashFunctionGSUtil = '/Users/johanvandenhoogen/exec -l /bin/bash/google-cloud-sdk/bin/gsutil'
 bashFunctionGSUtil = '/Users/johanvandenhoogen/google-cloud-sdk/bin/gsutil'
 
 # Specify the arguments to these functions
@@ -349,7 +365,9 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
         classifiedValidationData_Spatial = validationData_Spatial.classify(trainedClassifier_Spatial,outputtedPropName_Spatial)
 
         if modelType == 'CLASSIFICATION':
-            # Compute the overall accuracy of the classification
+            # Compute the categorical levels of the class property
+            categoricalLevels = ee.Dictionary(ee.FeatureCollection(fcOI).reduceColumns(ee.Reducer.frequencyHistogram(),[classProperty])).keys()    # Compute the overall accuracy of the classification
+            
             errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels)
             overallAccuracy_Random = ee.Number(errorMatrix_Random.accuracy())
 
@@ -469,18 +487,22 @@ try:
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20240604_AM_SSU_sampled_onehot_outliersRemoved_rwr.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20250116_AMF_rwr_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
-    # rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
+    rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 123).reset_index(drop=True)
 
     # Remove duplicates / pixel aggregate
     preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
     print('Number of aggregated pixels', preppedCollection.shape[0])
+
+    # Replace NA values in columns area_sampled and extraction_dna_mass with reference values; 100 and 0.5 respectively
+    preppedCollection['area_sampled'] = preppedCollection['area_sampled'].fillna(100)
+    preppedCollection['extraction_dna_mass'] = preppedCollection['extraction_dna_mass'].fillna(0.5)
 
     # Drop NAs
     preppedCollection = preppedCollection.dropna(how='any')
@@ -541,7 +563,6 @@ except Exception as e:
 
     # Write the CSV to disk 
     preppedCollection_wSpatialFolds.to_csv(localPathToCVAssignedData,index=False)
-
 
     try:
         # try whether fcOI is present
@@ -669,7 +690,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_grid_search_results.csv', index=False)
+classDfSorted.to_csv('output/'+today+"_"+classProperty+'_grid_search_results.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
@@ -761,7 +782,7 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+guild+'_'+classProperty+'_pred_obs.csv', index=False)
+predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
 #################################################################################################################################################################
 # Classify image
@@ -788,6 +809,8 @@ primersNS1_NS41_then_AML1_AML2 = ee.Image.constant(0)
 primersNS31_AM1 = ee.Image.constant(0)
 primersNS31_AML2 = ee.Image.constant(0)
 primersWANDA_AML2 = ee.Image.constant(0)
+area_sampled = ee.Image.constant(100)
+extraction_dna_mass = ee.Image.constant(0.5)
 
 constant_imgs = ee.ImageCollection.fromImages([
     sequencing_platform454Roche,
@@ -811,6 +834,8 @@ constant_imgs = ee.ImageCollection.fromImages([
     primersNS31_AM1,
     primersNS31_AML2,
     primersWANDA_AML2,
+    area_sampled,
+    extraction_dna_mass
 ]).toBands().rename([
     'sequencing_platform454Roche',
     'sequencing_platformIllumina',
@@ -833,6 +858,8 @@ constant_imgs = ee.ImageCollection.fromImages([
     'primersNS31_AM1',
     'primersNS31_AML2',
     'primersWANDA_AML2',
+    'area_sampled',
+    'extraction_dna_mass'
 ])
 
 def finalImageClassification(compositeImg):
@@ -936,7 +963,7 @@ featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances
 plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
                                 title='Feature Importances')
 fig = plt.get_figure()
-fig.savefig('output/'+today+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+fig.savefig('output/'+today+"_"+guild+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
 
 print('Variable importance metrics complete! Moving on...')
 
@@ -1287,8 +1314,6 @@ buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 
 # Set number of repetitions
 n_reps = 10
 nList = list(range(0,n_reps))
-
-fcOI = ee.FeatureCollection('users/johanvandenhoogen/000_SPUN_GFv4_10/arbuscular_mycorrhizal_KNNDMW/arbuscular_mycorrhizal_richness_training_data')
 
 n_points = 1000
 
