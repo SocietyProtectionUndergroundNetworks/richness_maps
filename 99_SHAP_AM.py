@@ -101,6 +101,8 @@ project_vars = [
 'primersNS31_AM1',
 'primersNS31_AML2',
 'primersWANDA_AML2',
+'area_sampled',
+'extraction_dna_mass'
 ]
 
 # Rename variables in df to increase readability

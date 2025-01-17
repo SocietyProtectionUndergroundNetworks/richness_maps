@@ -896,21 +896,6 @@ def finalImageClassification(compositeImg):
 compositeToClassify = compositeOfInterest.addBands(constant_imgs).select(covariateList).reproject(compositeOfInterest.projection())
 classifiedImage = finalImageClassification(compositeToClassify)
 
-# if log_transform_classProperty == True:
-#     classifiedImage = classifiedImage.exp().subtract(1)
-
-# classifiedImageExport = ee.batch.Export.image.toAsset(
-#     image = classifiedImage.toFloat(),
-#     description = classProperty+'_ClassifiedImage',
-#     assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_ClassifiedImage',
-#     crs = 'EPSG:4326',
-#     crsTransform = '[0.08333333333333333,0,-180,0,-0.08333333333333333,90]',
-#     region = exportingGeometry,
-#     maxPixels = int(1e13),
-#     pyramidingPolicy = {".default": pyramidingPolicy}
-# )
-# classifiedImageExport.start()
-
 ##################################################################################################################################################################
 # Variable importance metrics
 ##################################################################################################################################################################
@@ -1099,6 +1084,8 @@ covariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'plant_diversity',
+'climate_stability_index'
 ]
 
 compositeToClassify = compositeToClassify.select(covariateList)
