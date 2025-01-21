@@ -101,7 +101,18 @@ covariateList = [
 'climate_stability_index'
 ]
 
-compositeOfInterest = ee.Image('projects/crowtherlab/Composite/CrowtherLab_Composite_30ArcSec')
+plant_diversity = ee.Image('projects/crowtherlab/johan/SPUN_layers/plant_SR_Ensemble_rasterized').rename('plant_diversity')
+climate_stability_index = ee.Image('projects/crowtherlab/johan/SPUN_layers/csi_past').rename('climate_stability_index')
+
+composite = ee.Image.cat([
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_bioComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_climateComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_geoComposite_30ArcSec"),
+		ee.Image("projects/crowtherlab/Composite/CrowtherLab_processComposite_30ArcSec"),
+		])
+
+# Add plant diversity and climate stability index to composite and reproject to composite projection
+compositeOfInterest = composite.addBands(plant_diversity).addBands(climate_stability_index).reproject(composite.projection()) 
 
 project_vars = [
 'sequencing_platform454Roche',
@@ -168,7 +179,7 @@ else:
     sort_acc_prop = sort_acc_prop + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
-titleOfCSVWithCVAssignments = classProperty+"_training_data"
+titleOfCSVWithCVAssignments = today + "_" + classProperty+"_training_data"
 
 # Asset ID of uploaded dataset after processing
 assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
@@ -360,6 +371,9 @@ def computeCVAccuracyAndRMSE(featureWithClassifier):
         classifiedValidationData_Spatial = validationData_Spatial.classify(trainedClassifier_Spatial,outputtedPropName_Spatial)
 
         if modelType == 'CLASSIFICATION':
+            # Compute the categorical levels of the class property
+            categoricalLevels = ee.Dictionary(ee.FeatureCollection(fcOI).reduceColumns(ee.Reducer.frequencyHistogram(),[classProperty])).keys()  
+            
             # Compute the overall accuracy of the classification
             errorMatrix_Random = classifiedValidationData_Random.errorMatrix(classProperty,outputtedPropName_Random,categoricalLevels)
             overallAccuracy_Random = ee.Number(errorMatrix_Random.accuracy())
@@ -480,18 +494,22 @@ try:
 
 except Exception as e:
     # Import raw data
-    rawPointCollection = pd.read_csv('data/20231001_EM_richness_rarefied_sampled_oneHot.csv', float_precision='round_trip')
+    rawPointCollection = pd.read_csv('data/20250117_ECM_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
     # Rename classification property column
     rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
 
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
-    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 42).reset_index(drop=True)
+    fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 123).reset_index(drop=True)
 
     # Remove duplicates
     preppedCollection = fcToAggregate.drop_duplicates(subset = covariateList+[classProperty], keep = 'first')[['sample_id']+covariateList+["Resolve_Biome"]+[classProperty]+['Pixel_Lat', 'Pixel_Long']]
     print('Number of aggregated pixels', preppedCollection.shape[0])
+
+    # Replace NA values in columns area_sampled and extraction_dna_mass with reference values; 100 and 0.5 respectively
+    preppedCollection['area_sampled'] = preppedCollection['area_sampled'].fillna(100)
+    preppedCollection['extraction_dna_mass'] = preppedCollection['extraction_dna_mass'].fillna(0.5)
 
     # Drop NAs
     preppedCollection = preppedCollection.dropna(how='any')
@@ -692,86 +710,86 @@ print('Moving on...')
 ##################################################################################################################################################################
 # Predicted - Observed
 ##################################################################################################################################################################
-fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
+# fcOI = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments)
 
-try:
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
-    predObs_wResiduals.size().getInfo()
+# try:
+#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#     predObs_wResiduals.size().getInfo()
 
-except Exception as e:
-    def predObs(fcOI):
-        if ensemble == False:
-            # Load the best model from the classifier list
-            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
+# except Exception as e:
+#     def predObs(fcOI):
+#         if ensemble == False:
+#             # Load the best model from the classifier list
+#             classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', bestModelName).first()).get('c'))
 
-            # Train the classifier with the collection
-            trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+#             # Train the classifier with the collection
+#             trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
             
-            # Classify the FC
-            classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
+#             # Classify the FC
+#             classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
-            return classifiedFC
+#             return classifiedFC
 
-        if ensemble == True:
-            def classifyFC(classifierName):
-                # Load the best model from the classifier list
-                classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+#         if ensemble == True:
+#             def classifyFC(classifierName):
+#                 # Load the best model from the classifier list
+#                 classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
             
-                # Train the classifier with the collection
-                trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
+#                 # Train the classifier with the collection
+#                 trainedClassifier = classifier.train(fcOI, classProperty, covariateList)
 
-                # Classify the FC
-                classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
+#                 # Classify the FC
+#                 classifiedFC = fcOI.classify(trainedClassifier,classProperty+'_Predicted')
 
-                return classifiedFC
+#                 return classifiedFC
 
-            # Map function over list of models in ensemble
-            classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
+#             # Map function over list of models in ensemble
+#             classifiedFC = ee.FeatureCollection(top_10Models.map(classifyFC)).flatten()
 
-            return classifiedFC
+#             return classifiedFC
 
-    # Classify FC
-    predObs = predObs(fcOI)
+#     # Classify FC
+#     predObs = predObs(fcOI)
 
-    # Add coordinates to FC
-    predObs = predObs.map(addLatLon)
+#     # Add coordinates to FC
+#     predObs = predObs.map(addLatLon)
 
-    # reverse log transform predicted and observed values
-    if log_transform_classProperty == True:
-        predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
-        predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
+#     # reverse log transform predicted and observed values
+#     if log_transform_classProperty == True:
+#         predObs = predObs.map(lambda f: f.set(classProperty, ee.Number(f.get(classProperty)).exp().subtract(1)))
+#         predObs = predObs.map(lambda f: f.set(classProperty+'_Predicted', ee.Number(f.get(classProperty+'_Predicted')).exp().subtract(1)))
 
-    # Add residuals to FC
-    predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
+#     # Add residuals to FC
+#     predObs_wResiduals = predObs.map(lambda f: f.set('AbsResidual', ee.Number(f.get(classProperty+'_Predicted')).subtract(f.get(classProperty)).abs()))
 
-    # Export to Assets
-    predObsexport = ee.batch.Export.table.toAsset(
-        collection = predObs_wResiduals,
-        description = classProperty+'_pred_obs',
-        assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
-    )
-    predObsexport.start()
+#     # Export to Assets
+#     predObsexport = ee.batch.Export.table.toAsset(
+#         collection = predObs_wResiduals,
+#         description = classProperty+'_pred_obs',
+#         assetId = 'users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs'
+#     )
+#     predObsexport.start()
 
-    # !! Break and wait
-    count = 1
-    while count >= 1:
-        taskList = [str(i) for i in ee.batch.Task.list()]
-        subsetList = [s for s in taskList if classProperty in s]
-        subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
-        count = len(subsubList)
-        print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
-        time.sleep(normalWaitTime)
-    print('Moving on...')
+#     # !! Break and wait
+#     count = 1
+#     while count >= 1:
+#         taskList = [str(i) for i in ee.batch.Task.list()]
+#         subsetList = [s for s in taskList if classProperty in s]
+#         subsubList = [s for s in subsetList if any(xs in s for xs in ['RUNNING', 'READY'])]
+#         count = len(subsubList)
+#         print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Waiting for pred/obs to complete...', end = '\r')
+#         time.sleep(normalWaitTime)
+#     print('Moving on...')
 
-    predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
+#     predObs_wResiduals = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_pred_obs')
 
-# Convert to pd
-predObs_df = GEE_FC_to_pd(predObs_wResiduals)
+# # Convert to pd
+# predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 
-# Group by sample ID to return mean across ensemble prediction
-predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
+# # Group by sample ID to return mean across ensemble prediction
+# predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
+# predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
 
 #################################################################################################################################################################
 # Classify image
@@ -1323,13 +1341,13 @@ for rep in nList:
         # fc_toMap = ee.FeatureCollection(ee.List(mapList).map(lambda n: ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',ee.List(n).get(0)).set('rep',ee.List(n).get(1))))
         fc_toMap = ee.FeatureCollection(ee.Feature(ee.Geometry.Point([0,0])).set('buffer_size',buffer).set('rep',rep))
 
-        grid_search_resultsRegression = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_Regression_grid_search_results')
+        grid_search_results = ee.FeatureCollection('users/'+usernameFolderString+'/'+projectFolder+'/'+classProperty+'_grid_search_results')
 
         # Get top model name
-        bestModelNameRegression = grid_search_resultsRegression.limit(1, 'Mean_R2', False).first().get('cName')
+        bestModelName = grid_search_results.limit(1, 'Mean_R2', False).first().get('cName')
 
         # Get top 10 models
-        top_10ModelsRegression = grid_search_resultsRegression.limit(10, 'Mean_R2', False).aggregate_array('cName')
+        top_10Models = grid_search_results.limit(10, 'Mean_R2', False).aggregate_array('cName')
 
         # Helper function 1: assess whether point is within sampled range
         def WithinRange(f):
@@ -1363,8 +1381,8 @@ for rep in nList:
             trainFC = fcOI.filter(ee.Filter.neq(classProperty, 0)).filter(ee.Filter.geometry(testFeature).Not())
 
             # Classifier to test: same hyperparameter settings as from grid search procedure
-            classifierName = top_10ModelsRegression.get(rep)
-            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierListRegression).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
+            classifierName = top_10Models.get(rep)
+            classifier = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName', 'equals', classifierName).first()).get('c'))
 
             # Train classifier
             trainedClassifer = classifier.train(trainFC, classProperty, covariateList)
