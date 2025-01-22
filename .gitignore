@@ -57,3 +57,5 @@ data/20250117_ECM_richness_rarefied_sampled.csv
 data/20250117_ECM_sampled_outliersRemoved.csv
 data/20250117_ECM_sampled_outliersRemoved_onehot.csv
 data/ectomycorrhizal_richness_bootstrapSamples.csv
+data/20250121_ECM_we_sampled_oneHot.csv
+data/20250121_ECM_rwr_sampled_oneHot.csv

@@ -13,7 +13,7 @@ today = datetime.date.today().strftime("%Y%m%d")
 
 # Constants
 classProperty = 'ectomycorrhizal_richness'
-df = pd.read_csv('data/ectomycorrhizal_richness_training_data.csv')
+df = pd.read_csv('data/20250121_ectomycorrhizal_richness_training_data.csv')
 
 # Variables to include in the model
 envCovariateList = [
@@ -47,7 +47,9 @@ envCovariateList = [
 'SG_Depth_to_bedrock',
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
-'SG_Soil_pH_H2O_005cm'
+'SG_Soil_pH_H2O_005cm',
+'plant_diversity',
+'climate_stability_index'
 ]
 
 # Rename variables in covariateList to increase readability
@@ -73,7 +75,9 @@ envCovariateListRenamed = [
     'Depth to Bedrock',
     'Sand Content at 5cm',
     'SOC at 5cm',
-    'Soil pH at 5cm'
+    'Soil pH at 5cm',
+    'Plant Diversity',
+    'Climate Stability Index'
 ]
 
 project_vars = [
@@ -105,6 +109,8 @@ project_vars = [
 'primersITS3ngs1_to_ITS3ngs11_ITS4ngs',
 'primersITS86F_ITS4',
 'primersITS9MUNngs_ITS4ngsUni',
+'area_sampled',
+'extraction_dna_mass',
 ]
 
 # Rename variables in df to increase readability
@@ -127,7 +133,7 @@ y = df[classProperty]
 
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
-    grid_search_results = pd.read_csv('output/20230922_ectomycorrhizal_richness_grid_search_results_Regression_kNNDMW_guildsFixed.csv')
+    grid_search_results = pd.read_csv('output/20250121_ectomycorrhizal_richness_grid_search_results.csv')
     VPS = int(grid_search_results['cName'][rep].split('VPS')[1].split('_')[0])
     LP = int(grid_search_results['cName'][rep].split('LP')[1].split('_')[0])
 
@@ -163,13 +169,13 @@ if __name__ == '__main__':
     reps = list(range(0, 10))
     with poolcontext(NPROC) as pool:
         try:
-            with np.load('shap_values_EM_richness.npz') as data:
+            with np.load('shap_values_ECM_richness.npz') as data:
                 shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
         except Exception as e:
             shap_values_list = pool.map(calculate_shap_values, reps)
               
             # Save SHAP values to file
-            np.savez('shap_values_EM_richness.npz', *shap_values_list)
+            np.savez('shap_values_ECM_richness.npz', *shap_values_list)
 
     # Plot 1: SHAP summary plot, with all features
     plt.figure()
