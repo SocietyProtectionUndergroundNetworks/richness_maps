@@ -1,8 +1,5 @@
-
 ## Load packages
-import geemap
 from geemap import *
-import os
 import time
 import requests
 

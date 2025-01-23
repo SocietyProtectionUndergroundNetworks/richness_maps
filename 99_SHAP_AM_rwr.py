@@ -11,7 +11,7 @@ import datetime
 today = datetime.date.today().strftime("%Y%m%d")
 # Constants
 classProperty = 'rwr'
-df = pd.read_csv('data/arbuscular_mycorrhizalrwr_training_data.csv')
+df = pd.read_csv('data/20250116_rwr_training_data.csv')
 
 # Variables to include in the model
 envCovariateList = [
