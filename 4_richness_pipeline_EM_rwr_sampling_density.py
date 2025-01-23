@@ -34,7 +34,7 @@ classProperty = 'rwr'
 
 # Input the name of the project folder inside which all of the assets will be stored
 # This folder will be generated automatically below, if it isn't yet present
-projectFolder = '000_SPUN_GFv4_12/' + guild + '_rwr'
+projectFolder = '000_SPUN_GFv4_12/' + guild + '_rwr_wSamplingDensity'
 
 # Input the normal wait time (in seconds) for "wait and break" cells
 normalWaitTime = 5
@@ -695,7 +695,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+"_"+guild+"_"+classProperty+'_grid_search_results.csv', index=False)
+classDfSorted.to_csv('output/'+today+"_"+guild+"_"+classProperty+'_grid_search_results_wSamplingDensity.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
@@ -971,13 +971,13 @@ if ensemble == True:
 
 # Write to csv
 featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
-featureImportances.to_csv('output/'+today+'_'+guild+"_"+classProperty+'_featureImportances.csv')
+featureImportances.to_csv('output/'+today+'_'+guild+"_"+classProperty+'_featureImportances_wSamplingDensity.csv')
 
 # Create and save plot
 plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
                                 title='Feature Importances')
 fig = plt.get_figure()
-fig.savefig('output/'+today+'_'+guild+"_"+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+fig.savefig('output/'+today+'_'+guild+"_"+classProperty+'_FeatureImportances_wSamplingDensity.png', bbox_inches='tight')
 
 print('Variable importance metrics complete! Moving on...')
 
