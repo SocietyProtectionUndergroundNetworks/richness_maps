@@ -887,7 +887,7 @@ constant_imgs = ee.ImageCollection.fromImages([
     'primersITS86F_ITS4',
     'primersITS9MUNngs_ITS4ngsUni',
     'area_sampled',
-    'extraction_dna_mass'
+    'extraction_dna_mass',
     'ecm_sampling_density'
 ])
 
