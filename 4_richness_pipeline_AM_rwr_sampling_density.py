@@ -491,9 +491,6 @@ except Exception as e:
     rawPointCollection = pd.read_csv('data/20250116_AMF_rwr_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
-    # Rename classification property column
-    rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
-
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
     fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 123).reset_index(drop=True)
 
@@ -987,7 +984,7 @@ for n in seedsToUseForBootstrapping:
     sampleToConcat = preppedCollection_wSpatialFolds.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
     sampleToConcat['bootstrapIteration'] = n
     stratSample = pd.concat([stratSample, sampleToConcat])
-
+'''
 # Format the title of the CSV and export it to a holding location
 fullLocalPath = holdingFolder+'/'+bootstrapSamples+'.csv'
 stratSample.to_csv(holdingFolder+'/'+bootstrapSamples+'.csv',index=False)
@@ -1021,7 +1018,7 @@ while count >= 1:
     count = len(subsubList)
     print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
     time.sleep(normalWaitTime)
-print('Moving on...')
+print('Moving on...')'''
 
 # Load the best model from the classifier list
 classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))

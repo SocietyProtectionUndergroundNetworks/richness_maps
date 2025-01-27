@@ -490,9 +490,6 @@ except Exception as e:
     rawPointCollection = pd.read_csv('data/20250116_AMF_rwr_sampled_outliersRemoved_onehot.csv', float_precision='round_trip')
     print('Size of original Collection', rawPointCollection.shape[0])
 
-    # Rename classification property column
-    rawPointCollection.rename(columns={'rarefied': classProperty}, inplace=True)
-
     # Shuffle the data frame while setting a new index to ensure geographic clumps of points are not clumped in any way
     fcToAggregate = rawPointCollection.sample(frac = 1, random_state = 123).reset_index(drop=True)
 
