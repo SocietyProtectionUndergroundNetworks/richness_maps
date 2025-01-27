@@ -11,7 +11,7 @@ import datetime
 today = datetime.date.today().strftime("%Y%m%d")
 # Constants
 classProperty = 'rwr'
-df = pd.read_csv('data/20250116_rwr_training_data.csv')
+df = pd.read_csv('data/20250127_arbuscular_mycorrhizal_rwr_training_data.csv')
 
 # Variables to include in the model
 envCovariateList = [
@@ -46,6 +46,8 @@ envCovariateList = [
 'SG_Sand_Content_005cm',
 'SG_SOC_Content_005cm',
 'SG_Soil_pH_H2O_005cm',
+'plant_diversity',
+'climate_stability_index',
 ]
 
 # Rename variables in covariateList to increase readability
@@ -71,7 +73,9 @@ envCovariateListRenamed = [
     'Depth to Bedrock',
     'Sand Content at 5cm',
     'SOC at 5cm',
-    'Soil pH at 5cm'
+    'Soil pH at 5cm',
+    'Plant Diversity',
+    'Climate Stability Index',
 ]
 
 project_vars = [
@@ -96,6 +100,8 @@ project_vars = [
 'primersNS31_AM1',
 'primersNS31_AML2',
 'primersWANDA_AML2',
+'area_sampled',
+'extraction_dna_mass',
 ]
 
 # Rename variables in df to increase readability
@@ -118,7 +124,7 @@ y = df[classProperty]
 
 # Train Random Forest models and calculate SHAP values
 def calculate_shap_values(rep):
-    grid_search_results = pd.read_csv('output/20240620_arbuscular_mycorrhizal_rwr_grid_search_results.csv')
+    grid_search_results = pd.read_csv('output/20250127_arbuscular_mycorrhizal_rwr_grid_search_results.csv')
     VPS = int(grid_search_results['cName'][rep].split('VPS')[1].split('_')[0])
     LP = int(grid_search_results['cName'][rep].split('LP')[1].split('_')[0])
 

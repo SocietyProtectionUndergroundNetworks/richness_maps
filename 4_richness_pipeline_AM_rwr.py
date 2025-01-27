@@ -137,13 +137,14 @@ project_vars = [
 'primersNS31_AML2',
 'primersWANDA_AML2',
 'area_sampled',
-'extraction_dna_mass'
+'extraction_dna_mass',
+'amf_sampling_density'
 ]
 
 # Add project-specific covariates to covariate list
 covariateList = covariateList + project_vars
 
-####################################################################################################################################################################
+###################################################################################################################################################################
 # Cross validation settings
 ####################################################################################################################################################################
 # Set k for k-fold CV
@@ -173,7 +174,7 @@ else:
     sort_acc_prop = sort_acc_prop + '_Random'
 
 # Input the title of the CSV that will hold all of the data that has been given a CV fold assignment
-titleOfCSVWithCVAssignments = today + "_" + guild + "_" + classProperty+"_training_data"
+titleOfCSVWithCVAssignments = today + "_" + guild + "_" + classProperty + "_training_data"
 
 # Asset ID of uploaded dataset after processing
 assetIDForCVAssignedColl = 'users/'+usernameFolderString+'/'+projectFolder+'/'+titleOfCSVWithCVAssignments
@@ -687,7 +688,7 @@ grid_search_results_export.start()
 classDfSorted = classDf.sort_values([sort_acc_prop], ascending = False)
 
 # Write model results to csv
-classDfSorted.to_csv('output/'+today+"_"+classProperty+'_grid_search_results.csv', index=False)
+classDfSorted.to_csv('output/'+today+"_"+guild+"_"+classProperty+'_grid_search_results.csv', index=False)
 
 # Get top model name
 bestModelName = grid_search_results.limit(1, sort_acc_prop, False).first().get('cName')
@@ -779,7 +780,7 @@ predObs_df = GEE_FC_to_pd(predObs_wResiduals)
 # Group by sample ID to return mean across ensemble prediction
 predObs_df = pd.DataFrame(predObs_df.groupby('sample_id').mean().to_records())
 
-predObs_df.to_csv('output/'+today+'_'+classProperty+'_pred_obs.csv')
+predObs_df.to_csv('output/'+today+"_"+guild+'_'+classProperty+'_pred_obs_wSamplingDensity.csv')
 
 #################################################################################################################################################################
 # Classify image
@@ -808,6 +809,7 @@ primersNS31_AML2 = ee.Image.constant(0)
 primersWANDA_AML2 = ee.Image.constant(0)
 area_sampled = ee.Image.constant(100)
 extraction_dna_mass = ee.Image.constant(0.5)
+amf_sampling_density = ee.Image(1)
 
 constant_imgs = ee.ImageCollection.fromImages([
     sequencing_platform454Roche,
@@ -832,7 +834,8 @@ constant_imgs = ee.ImageCollection.fromImages([
     primersNS31_AML2,
     primersWANDA_AML2,
     area_sampled,
-    extraction_dna_mass
+    extraction_dna_mass,
+    amf_sampling_density
 ]).toBands().rename([
     'sequencing_platform454Roche',
     'sequencing_platformIllumina',
@@ -856,7 +859,8 @@ constant_imgs = ee.ImageCollection.fromImages([
     'primersNS31_AML2',
     'primersWANDA_AML2',
     'area_sampled',
-    'extraction_dna_mass'
+    'extraction_dna_mass',
+    'amf_sampling_density'
 ])
 
 def finalImageClassification(compositeImg):
@@ -954,13 +958,13 @@ if ensemble == True:
 
 # Write to csv
 featureImportances.sort_values('Feature_Importance', ascending = False ,inplace = True)
-featureImportances.to_csv('output/'+today+'_'+classProperty+'_featureImportances.csv')
+featureImportances.to_csv('output/'+today+"_"+guild+'_'+classProperty+'_featureImportances_wSamplingDensity.csv')
 
 # Create and save plot
 plt = featureImportances[:10].plot(x='Variable', y='Feature_Importance', kind='bar', legend=False,
                                 title='Feature Importances')
 fig = plt.get_figure()
-fig.savefig('output/'+today+"_"+guild+'_'+classProperty+'_FeatureImportances.png', bbox_inches='tight')
+fig.savefig('output/'+today+"_"+guild+'_'+classProperty+'_FeatureImportances_wSamplingDensity.png', bbox_inches='tight')
 
 print('Variable importance metrics complete! Moving on...')
 
@@ -980,7 +984,7 @@ for n in seedsToUseForBootstrapping:
     sampleToConcat = preppedCollection_wSpatialFolds.groupby(stratificationVariableString, group_keys=False).apply(lambda x: x.sample(n=int(round((strataDict.get(x.name)/100)*bootstrapModelSize)), replace=True, random_state=n))
     sampleToConcat['bootstrapIteration'] = n
     stratSample = pd.concat([stratSample, sampleToConcat])
-
+'''
 # Format the title of the CSV and export it to a holding location
 fullLocalPath = holdingFolder+'/'+bootstrapSamples+'.csv'
 stratSample.to_csv(holdingFolder+'/'+bootstrapSamples+'.csv',index=False)
@@ -1014,7 +1018,7 @@ while count >= 1:
     count = len(subsubList)
     print(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'), 'Number of running jobs:', count)
     time.sleep(normalWaitTime)
-print('Moving on...')
+print('Moving on...')'''
 
 # Load the best model from the classifier list
 classifierToBootstrap = ee.Classifier(ee.Feature(ee.FeatureCollection(classifierList).filterMetadata('cName','equals',bestModelName).first()).get('c'))
