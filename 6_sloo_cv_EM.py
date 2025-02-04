@@ -16,7 +16,7 @@ from functions.determineBlockSizeForCV import *
 ee.Initialize()
 
 today = datetime.date.today().strftime("%Y%m%d")
-
+today = '20250121'
 guild = 'ectomycorrhizal'
 
 ####################################################################################################################################################################
@@ -602,7 +602,7 @@ for rep in nList:
             # Apply blocked leave one out CV function
             predicted = fc_withinSampledRange.map(BLOOcv)
             # predicted = fc_wBuffer.map(BLOOcv)
-            
+
             # Calculate R2 value
             R2_val = coefficientOfDetermination(predicted, classProperty, 'predicted')
 
@@ -615,9 +615,8 @@ for rep in nList:
         bloo_cv_fc_export = ee.batch.Export.table.toAsset(
             collection = sloo_cv,
             description = classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer),
-            assetId = 'projects/crowtherlab/johan/SPUN/EM_sloo_cv/'+classProperty+'_sloo_cv_results_wExtrapolation_'+str(buffer)+'_rep_'+str(rep),
+            assetId = 'projects/crowtherlab/johan/SPUN/EM_sloo_cv/'+classProperty+'_sloo_cv_results_woExtrapolation_'+str(buffer)+'_rep_'+str(rep),
         )
 
-        # bloo_cv_fc_export.start()
+        bloo_cv_fc_export.start()
 
-    print('Blocked Leave-One-Out started! Moving on...')
