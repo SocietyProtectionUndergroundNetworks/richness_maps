@@ -122,5 +122,5 @@ if __name__ == '__main__':
 						range(0, size))
 				results = pd.concat(results)
 
-				# results.groupby('sample_id').mean().to_records()
+				results.groupby('sample_id').mean().to_records()
 				results.to_csv("output/20250204_arbuscular_mycorrhizal_richness_pred_obs.csv")
