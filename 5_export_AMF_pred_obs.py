@@ -6,8 +6,11 @@ import numpy as np
 from functools import partial
 from contextlib import contextmanager
 from multiprocessing import Value, Lock, Process
+import datetime
 
 ee.Initialize()
+
+today = datetime.date.today().strftime("%Y%m%d")
 
 # FeatureCollection to sample
 points = ee.FeatureCollection("users/johanvandenhoogen/000_SPUN_GFv4_12/arbuscular_mycorrhizal/arbuscular_mycorrhizal_richness_pred_obs")
@@ -123,4 +126,4 @@ if __name__ == '__main__':
 				results = pd.concat(results)
 
 				results.groupby('sample_id').mean().to_records()
-				results.to_csv("output/20250204_arbuscular_mycorrhizal_richness_pred_obs.csv")
+				results.to_csv("output/"+today+"_arbuscular_mycorrhizal_richness_pred_obs.csv")
