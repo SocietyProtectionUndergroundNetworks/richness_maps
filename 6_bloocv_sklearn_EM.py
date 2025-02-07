@@ -99,6 +99,8 @@ project_vars = [
 covariateList = covariateList + project_vars
 
 def run_spatial_loo_cv(buffer_size, rep):
+    np.random.seed(rep)
+
     # Project to a meter-based CRS
     gdf_proj = gdf.to_crs('epsg:3857')
 
@@ -140,17 +142,25 @@ def run_spatial_loo_cv(buffer_size, rep):
 
     # Perform spatial Leave-One-Out Cross-Validation
     n_splits = loo.get_n_splits(X)
-    # for train_idx, test_idx in tqdm(loo.split(X), total=n_splits, desc=f"Spatial LOO CV (buffer={buffer_size})"):
-    for train_idx, test_idx in loo.split(X):
-        test_point = gdf_proj.iloc[test_idx[0]]['geometry_buffer']
-        train_points = gdf_proj#.iloc[train_idx]
-        train_points = train_points[train_points['geometry'].disjoint(test_point)]
 
-        if not train_points.empty:
-            classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
-            predictions.append(classifier.predict(X[test_idx])[0])
+    for train_idx, test_idx_full in loo.split(X):
+        # Randomly select up to 2500 points from test_idx_full
+        if len(test_idx_full) > 2500:
+            test_idx = np.random.choice(test_idx_full, 2500, replace=False)
         else:
-            predictions.append(np.nan)
+            test_idx = test_idx_full
+
+        # Process each test point
+        for test_point_idx in test_idx:
+            test_point = gdf_proj.iloc[test_point_idx]['geometry_buffer']
+            train_points = gdf_proj.copy()
+            train_points = train_points[train_points['geometry'].disjoint(test_point)]
+
+            if not train_points.empty:
+                classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
+                predictions.append(classifier.predict(X[test_point_idx].reshape(1, -1))[0])
+            else:
+                predictions.append(np.nan)
 
     # Calculate R-squared value
     r2 = r2_score(y, predictions)
@@ -159,7 +169,7 @@ def run_spatial_loo_cv(buffer_size, rep):
                            'rep': rep,
                            'buffer_size': buffer_size}, index=[0])
 
-    return output 
+    return output
 
 @contextmanager
 def poolcontext(*args, **kwargs):

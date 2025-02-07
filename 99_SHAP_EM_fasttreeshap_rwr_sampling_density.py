@@ -13,7 +13,7 @@ today = datetime.date.today().strftime("%Y%m%d")
 
 # Constants
 classProperty = 'rwr'
-df = pd.read_csv('data/20250121_ectomycorrhizal_rwr_training_data.csv')
+df = pd.read_csv('data/20250123_ectomycorrhizal_rwr_training_data_samplingdensity.csv')
 
 # Variables to include in the model
 envCovariateList = [
@@ -170,13 +170,13 @@ if __name__ == '__main__':
     reps = list(range(0, 10))
     with poolcontext(NPROC) as pool:
         try:
-            with np.load('shap_values_EM_rwr.npz') as data:
+            with np.load('shap_values_EM_rwr_samplingdens.npz') as data:
                 shap_values_list = [data[f'arr_{i}'] for i in range(len(data.keys()))]
         except Exception as e:
             shap_values_list = pool.map(calculate_shap_values, reps)
               
             # Save SHAP values to file
-            np.savez('shap_values_EM_rwr.npz', *shap_values_list)
+            np.savez('shap_values_EM_rwr_samplingdens.npz', *shap_values_list)
 
     # Plot 1: SHAP summary plot, with all features
     plt.figure()
