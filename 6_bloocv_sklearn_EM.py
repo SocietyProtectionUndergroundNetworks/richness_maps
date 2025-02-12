@@ -4,6 +4,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import multiprocessing
+import os
 import itertools
 from shapely.geometry import Point
 from sklearn.metrics import r2_score
@@ -14,7 +15,7 @@ from contextlib import contextmanager
 
 # Constants
 classProperty = 'ectomycorrhizal_richness'
-df = pd.read_csv('data/20250121_ectomycorrhizal_richness_training_data.csv')#, nrows=20)
+df = pd.read_csv('data/20250121_ectomycorrhizal_richness_training_data.csv')# nrows=20)
 
 today = datetime.date.today().strftime("%Y%m%d")
 
@@ -24,6 +25,9 @@ gdf = gpd.GeoDataFrame(df, geometry=geometry)
 
 # Set CRS to WGS84
 gdf = gdf.set_crs('epsg:4326')
+
+# Project to a meter-based CRS
+gdf_proj = gdf.to_crs('epsg:3857')
 
 # Variables to include in the model
 covariateList = [
@@ -95,40 +99,39 @@ project_vars = [
 'extraction_dna_mass',
 ]
 
+grid_search_results = pd.read_csv('output/20250121_ectomycorrhizal_richness_grid_search_results.csv')
+
+# Initialize LeaveOneOut and classifier
+loo = LeaveOneOut()
+classifier = RandomForestRegressor()
+
 # Create final list of covariates
 covariateList = covariateList + project_vars
 
-def run_spatial_loo_cv(buffer_size, rep):
-    np.random.seed(rep)
+def spatial_loo_cv(buffer_size, rep, test_index):
+    """ 
+    Perform spatial Leave-One-Out Cross-Validation (LOO) for a given buffer size, repetition, and test indices.
+    
+    Parameters:
+        buffer_size (int): Buffer size for spatial exclusion (not used explicitly in this function, but included for parallel execution).
+        rep (int): Index of the hyperparameter configuration.
+        test_indices (list): List of test indices to evaluate.
 
-    # Project to a meter-based CRS
-    gdf_proj = gdf.to_crs('epsg:3857')
-
-    # Create buffer in meters
-    gdf_proj['geometry_buffer'] = gdf_proj.buffer(buffer_size)
-
-    # Initialize LeaveOneOut and classifier
-    loo = LeaveOneOut()
-    classifier = RandomForestRegressor()
+    Returns:
+        pd.DataFrame: A DataFrame containing (test_index, rep, buffer_size, y_true, y_pred)
+    """
 
     # Read in the grid search results from GEE
-    grid_search_results = pd.read_csv('output/20250121_ectomycorrhizal_richness_grid_search_results.csv')
     VPS = grid_search_results['cName'][rep].split('VPS')[1].split('_')[0]
     LP = grid_search_results['cName'][rep].split('LP')[1].split('_')[0]
-    # MN = grid_search_results['cName'][rep].split('MN')[1].split('_')[0]
-    # if MN == 'None':
-    #     MN = None
-    # else:
-    #     MN = np.int(MN)
 
     # Define the hyperparameters
     hyperparameters = {
-        'n_estimators': 250, # number of trees
-        # 'max_depth': MN, # maxNodes
-        'min_samples_split': int(LP), # minLeafPopulation
-        'max_features': int(VPS), # variablesPerSplit
-        'max_samples': 0.632, # bagFraction
-        'random_state': 42 # randomSeed
+        'n_estimators': 250,  # Number of trees
+        'min_samples_split': int(LP),  # minLeafPopulation
+        'max_features': int(VPS),  # variablesPerSplit
+        'max_samples': 0.632,  # bagFraction
+        'random_state': 123  # randomSeed
     }
 
     # Set hyperparameters
@@ -138,68 +141,39 @@ def run_spatial_loo_cv(buffer_size, rep):
     X = gdf_proj[covariateList].values
     y = gdf_proj[classProperty].values
 
-    # predictions = []
+    # Create buffer in meters
+    gdf_proj['geometry_buffer'] = gdf_proj.buffer(buffer_size)
 
-    # # Perform spatial Leave-One-Out Cross-Validation
-    # n_splits = loo.get_n_splits(X)
-    # stop_flag = False
-    # for train_idx, test_idx in loo.split(X):
-
-    #     if stop_flag:
-    #         break
-
-    #     # Process each test point
-    #     for test_point_idx in test_idx:
-    #         test_point = gdf_proj.iloc[test_point_idx]['geometry_buffer']
-    #         train_points = gdf_proj.copy()
-    #         train_points = train_points[train_points['geometry'].disjoint(test_point)]
-
-    #         if not train_points.empty:
-    #             classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
-    #             predictions.append(classifier.predict(X[test_point_idx].reshape(1, -1))[0])
-    #         else:
-    #             predictions.append(np.nan)
-
-    #         if len(predictions) == 2500:
-    #             stop_flag = True
-    #             break
-
-    # # Calculate R-squared value
-    # r2 = r2_score(y, predictions)
-
-    # Select 2500 random test points
-    test_indices = np.random.choice(len(X), 2500, replace=False)
-
-    predictions = []
-    y_selected = []  # Store corresponding true values of y
-
-    for train_idx, test_idx in loo.split(X):
-        # Only process if the current test index is in the selected random test indices
-        if test_idx[0] in test_indices:
-            test_point_idx = test_idx[0]
-            test_point = gdf_proj.iloc[test_point_idx]['geometry_buffer']
-            train_points = gdf_proj.copy()
-            train_points = train_points[train_points['geometry'].disjoint(test_point)]
-            
-            if not train_points.empty:
-                classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
-                predictions.append(classifier.predict(X[test_point_idx].reshape(1, -1))[0])
-            else:
-                predictions.append(np.nan)
-
-            # Collect corresponding y values
-            y_selected.append(y[test_point_idx])
-
-    # Ensure we only compute R² if we have valid predictions
-    r2 = r2_score(y_selected, predictions)
-
-    output = pd.DataFrame({'r2': r2,
-                           'rep': rep,
-                           'buffer_size': buffer_size}, index=[0])
+    # Extract test points
+    test_point = gdf_proj.iloc[test_index]['geometry_buffer']
     
-    output.to_csv('tmp/ectomycorrhizal_SLOO_CV_'+str(buffer_size)+'_'+str(rep)+'.csv')
+    # Train on spatially disjoint data
+    train_points = gdf_proj
+    train_points = train_points[train_points['geometry'].disjoint(test_point)]
 
-    return output
+    if not train_points.empty:
+        classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
+        prediction = classifier.predict(X[test_index].reshape(1, -1))[0]
+    else:
+        prediction = np.nan
+
+    # Get corresponding y values for the selected test indices
+    y_selected = y[test_index]
+
+    # Return results as a DataFrame
+    result_df = pd.DataFrame([{
+        "test_index": test_index,
+        "rep": rep,
+        "buffer_size": buffer_size,
+        "y_true": y_selected,
+        "y_pred": prediction
+    }])
+
+    # result_df.to_csv('output/tmp/sloo_cv'+str(buffer_size)+'_'+str(rep)+'_'+str(test_index)+'.csv')
+    with open('output/merged/ectomycorrhizal_SLOO_CV_'+str(buffer_size)+'.csv', 'a') as f:
+        result_df.to_csv(f, header=f.tell()==0, index=False)
+
+    return result_df
 
 @contextmanager
 def poolcontext(*args, **kwargs):
@@ -208,15 +182,71 @@ def poolcontext(*args, **kwargs):
     yield pool
     pool.terminate()
 
+
+def calc_r2(pd_series):
+    """Calculate R-squared."""
+    return r2_score(pd_series['y_true'], pd_series['y_pred'])
+
 if __name__ == '__main__':
-    # Define the list of buffer sizes to use 
     buffer_sizes = [1000, 2500, 5000, 10000, 50000, 100000, 250000, 500000, 750000, 1000000, 1500000, 2000000]
     reps = list(range(0,10))
 
+    test_idx_list = [test_idx[0] for _, test_idx in loo.split(gdf_proj)] 
+
+    # Compute total expected unique combinations
+    total_combinations = set(itertools.product(buffer_sizes, reps, test_idx_list))
+
+    completed_combinations = set()
+
+    print("Checking completed combinations in CSVs...")
+
+    # Read existing completed combinations
+    for buffer_size in buffer_sizes:
+        merged_file = f'output/merged/ectomycorrhizal_SLOO_CV_{buffer_size}.csv'
+
+        if os.path.exists(merged_file):
+            finished = pd.read_csv(merged_file, dtype=str, on_bad_lines='skip', header=0)
+
+            if {'rep', 'buffer_size', 'test_index'}.issubset(finished.columns):
+                finished = finished[['buffer_size', 'rep', 'test_index']].apply(pd.to_numeric, errors='coerce').dropna()
+
+                finished_records = set(zip(
+                    finished['buffer_size'].astype(int),
+                    finished['rep'].astype(int),
+                    finished['test_index'].astype(int)
+                ))
+
+                completed_combinations.update(finished_records)
+
+    print(f"Found {len(completed_combinations)} completed combinations.")
+
+    # Ensure unique remaining combinations
+    remaining_combinations = total_combinations - completed_combinations
+
+    print("Checking uniqueness before execution...")
+    remaining_list = list(remaining_combinations)
+
+    # Check for duplicates before execution
+    if len(remaining_list) != len(set(remaining_list)):
+        print("Warning: Duplicates detected in remaining_combinations before processing!")
+
+    print(f"Total unique combinations to process: {len(remaining_combinations)}")
+
+    # Check if (5000, 9, 12472) is in remaining_combinations
+    # print((5000, 9, 12472) in remaining_combinations)
+
+    # Run in parallel
     NPROC = 256
     with poolcontext(NPROC) as pool:
-        results = pool.starmap(run_spatial_loo_cv, list(itertools.product(buffer_sizes, reps)))
-       
-        # Combine the results into a single dataframe and save to CSV
-        combined = pd.concat(results)
-        combined.to_csv("output/"+today+"_ectomycorrhizal_SLOO_CV.csv")
+        results = pool.starmap(spatial_loo_cv, remaining_list)
+
+        # Combine results
+        combined = pd.concat([r for r in results if r is not None])
+
+        # Calculate R-squared values
+        r2_values = combined.groupby(['buffer_size', 'rep'], group_keys=False)[['y_true', 'y_pred']].apply(calc_r2)
+
+        # Rename and save results
+        r2_values = r2_values.reset_index()
+        r2_values.columns = ['buffer_size', 'rep', 'r2']
+        r2_values.to_csv(f"output/{today}_ectomycorrhizal_SLOO_CV_v2.csv", index=False)
