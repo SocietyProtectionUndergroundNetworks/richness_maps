@@ -138,36 +138,66 @@ def run_spatial_loo_cv(buffer_size, rep):
     X = gdf_proj[covariateList].values
     y = gdf_proj[classProperty].values
 
+    # predictions = []
+
+    # # Perform spatial Leave-One-Out Cross-Validation
+    # n_splits = loo.get_n_splits(X)
+    # stop_flag = False
+    # for train_idx, test_idx in loo.split(X):
+
+    #     if stop_flag:
+    #         break
+
+    #     # Process each test point
+    #     for test_point_idx in test_idx:
+    #         test_point = gdf_proj.iloc[test_point_idx]['geometry_buffer']
+    #         train_points = gdf_proj.copy()
+    #         train_points = train_points[train_points['geometry'].disjoint(test_point)]
+
+    #         if not train_points.empty:
+    #             classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
+    #             predictions.append(classifier.predict(X[test_point_idx].reshape(1, -1))[0])
+    #         else:
+    #             predictions.append(np.nan)
+
+    #         if len(predictions) == 2500:
+    #             stop_flag = True
+    #             break
+
+    # # Calculate R-squared value
+    # r2 = r2_score(y, predictions)
+
+    # Select 2500 random test points
+    test_indices = np.random.choice(len(X), 2500, replace=False)
+
     predictions = []
+    y_selected = []  # Store corresponding true values of y
 
-    # Perform spatial Leave-One-Out Cross-Validation
-    n_splits = loo.get_n_splits(X)
-
-    for train_idx, test_idx_full in loo.split(X):
-        # Randomly select up to 2500 points from test_idx_full
-        if len(test_idx_full) > 2500:
-            test_idx = np.random.choice(test_idx_full, 2500, replace=False)
-        else:
-            test_idx = test_idx_full
-
-        # Process each test point
-        for test_point_idx in test_idx:
+    for train_idx, test_idx in loo.split(X):
+        # Only process if the current test index is in the selected random test indices
+        if test_idx[0] in test_indices:
+            test_point_idx = test_idx[0]
             test_point = gdf_proj.iloc[test_point_idx]['geometry_buffer']
             train_points = gdf_proj.copy()
             train_points = train_points[train_points['geometry'].disjoint(test_point)]
-
+            
             if not train_points.empty:
                 classifier.fit(train_points[covariateList].values, train_points[classProperty].values)
                 predictions.append(classifier.predict(X[test_point_idx].reshape(1, -1))[0])
             else:
                 predictions.append(np.nan)
 
-    # Calculate R-squared value
-    r2 = r2_score(y, predictions)
+            # Collect corresponding y values
+            y_selected.append(y[test_point_idx])
+
+    # Ensure we only compute R² if we have valid predictions
+    r2 = r2_score(y_selected, predictions)
 
     output = pd.DataFrame({'r2': r2,
                            'rep': rep,
                            'buffer_size': buffer_size}, index=[0])
+    
+    output.to_csv('tmp/ectomycorrhizal_SLOO_CV_'+str(buffer_size)+'_'+str(rep)+'.csv')
 
     return output
 
